@@ -9,4 +9,5 @@ paths = [
 ]
 regexes = [
   '''4633458b-17de-408a-b874-0445c86b69e6''',  # Azure built-in role id (Key Vault Secrets User), public
+  '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',  # Azurite's documented development key (devstoreaccount1), public
 ]
