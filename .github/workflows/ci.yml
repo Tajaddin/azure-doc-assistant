@@ -31,7 +31,7 @@ jobs:
       - run: dotnet build -c Release --no-restore
       - name: unit tests
         run: dotnet test tests/DocAssistant.UnitTests -c Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults/unit
-      - name: integration tests (Testcontainers: pgvector + Azurite)
+      - name: "integration tests (Testcontainers: pgvector + Azurite)"
         run: dotnet test tests/DocAssistant.IntegrationTests -c Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults/integration
       - name: coverage report
         run: |
