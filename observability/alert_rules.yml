@@ -1,0 +1,64 @@
+# Alerts for the document assistant. Each has a promtool unit test in alerts_test.yml.
+# Metric names follow the OpenTelemetry Prometheus exporter: dots become underscores, units are suffixed.
+groups:
+  - name: docassistant
+    rules:
+      - alert: ApiDown
+        expr: up{job="docassistant-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "the API is not being scraped"
+          description: "Prometheus has not scraped docassistant-api for 2 minutes."
+
+      - alert: AskHighErrorRate
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{http_route="/api/ask",http_response_status_code=~"5.."}[5m]))
+            / sum(rate(http_server_request_duration_seconds_count{http_route="/api/ask"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "more than 5% of /api/ask requests fail"
+          description: "5xx share over 5 minutes is {{ $value | humanizePercentage }}."
+
+      - alert: AskHighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum(rate(docassistant_ask_duration_seconds_bucket[5m])) by (le)) > 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 answer latency above 30 s"
+          description: "p95 over 5 minutes is {{ $value | humanizeDuration }}."
+
+      - alert: IngestionFailures
+        expr: |
+          sum(increase(docassistant_ingest_count_total{outcome="error"}[15m])) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "documents are failing to ingest"
+          description: "{{ $value }} ingestion failures in the last 15 minutes."
+
+      - alert: ModelSpendBurn
+        expr: increase(docassistant_cost_usd_total[1h]) > 2
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "model spend above $2 in the last hour"
+          description: "Estimated spend in the last hour: ${{ $value | printf \"%.2f\" }}."
+
+      - alert: UncitedAnswers
+        expr: |
+          sum(rate(docassistant_ask_count_total{status="answered",cited="false"}[30m]))
+            / sum(rate(docassistant_ask_count_total{status="answered"}[30m])) > 0.5
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "more than half of answers carry no citation"
+          description: "Uncited share over 30 minutes is {{ $value | humanizePercentage }}; the model or the retrieval regressed."

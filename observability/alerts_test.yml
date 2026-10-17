@@ -1,0 +1,121 @@
+# promtool test rules observability/alerts_test.yml
+rule_files:
+  - alert_rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    name: ApiDown fires after two minutes
+    input_series:
+      - series: 'up{job="docassistant-api", instance="api:8080"}'
+        values: "1 1 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ApiDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: ApiDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: docassistant-api, instance: "api:8080" }
+            exp_annotations:
+              summary: "the API is not being scraped"
+              description: "Prometheus has not scraped docassistant-api for 2 minutes."
+
+  - interval: 1m
+    name: AskHighErrorRate fires at 10% and not at 1%
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{http_route="/api/ask", http_response_status_code="200"}'
+        values: "0+90x20"
+      - series: 'http_server_request_duration_seconds_count{http_route="/api/ask", http_response_status_code="500"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: AskHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "more than 5% of /api/ask requests fail"
+              description: "5xx share over 5 minutes is 10%."
+
+  - interval: 1m
+    name: AskHighErrorRate stays quiet at 1%
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{http_route="/api/ask", http_response_status_code="200"}'
+        values: "0+99x20"
+      - series: 'http_server_request_duration_seconds_count{http_route="/api/ask", http_response_status_code="500"}'
+        values: "0+1x20"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: AskHighErrorRate
+        exp_alerts: []
+
+  - interval: 1m
+    name: AskHighLatencyP95 fires when most answers take over 30 s
+    input_series:
+      - series: 'docassistant_ask_duration_seconds_bucket{le="10"}'
+        values: "0+1x20"
+      - series: 'docassistant_ask_duration_seconds_bucket{le="30"}'
+        values: "0+1x20"
+      - series: 'docassistant_ask_duration_seconds_bucket{le="60"}'
+        values: "0+10x20"
+      - series: 'docassistant_ask_duration_seconds_bucket{le="+Inf"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AskHighLatencyP95
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "p95 answer latency above 30 s"
+              description: "p95 over 5 minutes is 58.33s."
+
+  - interval: 1m
+    name: IngestionFailures fires on four failures in fifteen minutes
+    input_series:
+      - series: 'docassistant_ingest_count_total{outcome="error"}'
+        values: "0 0 0 1 2 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: IngestionFailures
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: IngestionFailures
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "documents are failing to ingest"
+              description: "4 ingestion failures in the last 15 minutes."
+
+  - interval: 1m
+    name: ModelSpendBurn fires above two dollars an hour
+    input_series:
+      - series: "docassistant_cost_usd_total"
+        values: "0+0.1x70"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ModelSpendBurn
+        exp_alerts: []
+      - eval_time: 65m
+        alertname: ModelSpendBurn
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "model spend above $2 in the last hour"
+              description: "Estimated spend in the last hour: $6.00."
+
+  - interval: 1m
+    name: UncitedAnswers fires when two thirds of answers lack citations
+    input_series:
+      - series: 'docassistant_ask_count_total{status="answered", cited="true"}'
+        values: "0+1x60"
+      - series: 'docassistant_ask_count_total{status="answered", cited="false"}'
+        values: "0+2x60"
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: UncitedAnswers
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "more than half of answers carry no citation"
+              description: "Uncited share over 30 minutes is 66.67%; the model or the retrieval regressed."

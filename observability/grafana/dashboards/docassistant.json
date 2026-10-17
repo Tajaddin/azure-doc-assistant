@@ -1,0 +1,80 @@
+{
+  "uid": "docassistant",
+  "title": "Document assistant",
+  "tags": ["docassistant", "llm", "azure"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Answers per minute by status and citation",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (status, cited) (increase(docassistant_ask_count_total[1m]))", "legendFormat": "{{status}} cited={{cited}}" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Answer latency p50 / p95",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum(rate(docassistant_ask_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum(rate(docassistant_ask_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Model spend, last hour (list prices; $0 for local models)",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "increase(docassistant_cost_usd_total[1h])" }],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4 }, "overrides": [] }
+    },
+    {
+      "id": 4, "type": "stat", "title": "Uncited share of answers (30m)",
+      "gridPos": { "x": 6, "y": 8, "w": 6, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(rate(docassistant_ask_count_total{status=\"answered\",cited=\"false\"}[30m])) / sum(rate(docassistant_ask_count_total{status=\"answered\"}[30m]))" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.5 }] } }, "overrides": [] }
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Tokens per minute",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (direction) (increase(docassistant_tokens_total[1m]))", "legendFormat": "{{direction}}" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Ingestion: pages per minute and outcomes",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(docassistant_ingest_pages_total[1m]))", "legendFormat": "pages/min" },
+        { "refId": "B", "expr": "sum by (outcome) (increase(docassistant_ingest_count_total[1m]))", "legendFormat": "{{outcome}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Tool calls per minute",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (tool) (increase(docassistant_tool_calls_total[1m]))", "legendFormat": "{{tool}}" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "HTTP requests per second by route and status",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{job=\"docassistant-api\"}[1m]))", "legendFormat": "{{http_route}} {{http_response_status_code}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+    },
+    {
+      "id": 9, "type": "text", "title": "Traces",
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "options": { "mode": "markdown", "content": "Open **Explore**, choose Tempo and search `service.name = docassistant-api`. One question is one trace: the ASP.NET Core server span, `ask` with `ask.retrieve`, one `ask.model.round` per model call and one `ask.tool` per function call. Ingestion traces come from `docassistant-worker` (`ingest`). In Azure the same spans land in Application Insights." }
+    }
+  ]
+}

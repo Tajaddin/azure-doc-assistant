@@ -1,0 +1,164 @@
+# Local stack. `docker compose up -d` runs the API, the ingestion worker, Postgres with pgvector and Azurite.
+# The model is Ollama on the host (http://host.docker.internal:11434); set Ai__Provider=fake for a model-less run.
+# `--profile observability` adds the OTel collector, Tempo, Prometheus, Alertmanager and Grafana.
+# Secrets come from .env (copy .env.example). Nothing is exposed beyond localhost.
+
+name: docassistant
+
+x-app-env: &app-env
+  Ai__Provider: ${AI_PROVIDER:-ollama}
+  Ai__Ollama__Endpoint: ${OLLAMA_ENDPOINT:-http://host.docker.internal:11434/v1}
+  Ai__Ollama__ChatModel: ${OLLAMA_CHAT_MODEL:-qwen2.5:3b}
+  Ai__Ollama__EmbeddingModel: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+  Ai__Ollama__EmbeddingDimensions: ${OLLAMA_EMBEDDING_DIMENSIONS:-768}
+  Ai__Azure__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
+  Ai__Azure__ApiKey: ${AZURE_OPENAI_API_KEY:-}
+  Analyzer__Provider: ${ANALYZER_PROVIDER:-pdfpig}
+  Postgres__ConnectionString: Host=postgres;Port=5432;Username=docs;Password=${POSTGRES_PASSWORD:-docs};Database=docs
+  Storage__ConnectionString: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf   # the collector's 4318 port; the exporter defaults to gRPC on 4317
+  DOTNET_gcServer: "0"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/DocAssistant.Api/Dockerfile
+    image: docassistant-api:local
+    environment:
+      <<: *app-env
+      ASPNETCORE_URLS: http://+:8080
+      Auth__Mode: dev
+      Auth__Dev__SigningKey: ${DEV_SIGNING_KEY:-dev-only-signing-key-change-me-0123456789}
+      RateLimits__AskPerMinute: ${ASK_PER_MINUTE:-30}
+      RateLimits__UploadPerMinute: ${UPLOAD_PER_MINUTE:-20}
+      Cors__Origins__0: http://localhost:5173
+      OTEL_SERVICE_NAME: docassistant-api
+    ports:
+      - "${API_PORT:-8080}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: src/DocAssistant.Worker/Dockerfile
+    image: docassistant-worker:local
+    environment:
+      <<: *app-env
+      OTEL_SERVICE_NAME: docassistant-worker
+      ASPNETCORE_URLS: http://+:9464
+    ports:
+      - "${WORKER_METRICS_PORT:-9464}:9464"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9464/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: docs
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docs}
+      POSTGRES_DB: docs
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docs -d docs"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.34.0
+    command: ["azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--skipApiVersionCheck", "--location", "/data", "--silent"]
+    volumes:
+      - azurite-data:/data
+    ports:
+      - "${AZURITE_BLOB_PORT:-10000}:10000"
+      - "${AZURITE_QUEUE_PORT:-10001}:10001"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.131.0
+    profiles: [observability]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    depends_on: [tempo]
+
+  tempo:
+    image: grafana/tempo:2.8.1
+    profiles: [observability]
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "${TEMPO_PORT:-3202}:3200"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [observability]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9092}:9090"
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    profiles: [observability]
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "${ALERTMANAGER_PORT:-9095}:9093"
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3003}:3000"
+    depends_on: [prometheus, tempo]
+
+volumes:
+  pgdata:
+  azurite-data:
+  tempo-data:
+  prometheus-data:
+  grafana-data:
