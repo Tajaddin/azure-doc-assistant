@@ -1,0 +1,12 @@
+# gitleaks: the default rules, plus the few matches that are test fixtures or public identifiers, not secrets
+[extend]
+useDefault = true
+
+[allowlist]
+description = "test fixtures and public identifiers"
+paths = [
+  '''tests/DocAssistant\.IntegrationTests/StackFixture\.cs''',  # fixed signing key for the test stack only
+]
+regexes = [
+  '''4633458b-17de-408a-b874-0445c86b69e6''',  # Azure built-in role id (Key Vault Secrets User), public
+]
