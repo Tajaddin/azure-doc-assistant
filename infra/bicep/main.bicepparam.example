@@ -1,0 +1,10 @@
+// Copy to main.bicepparam (gitignored) and fill in. The Postgres password is passed on the command line by deploy.sh.
+using './main.bicep'
+
+param name = 'docassist'
+param location = 'eastus2'
+param apiClientId = '<api app registration client id>'
+param spaClientId = '<spa app registration client id>'
+param githubRepository = 'Tajaddin/azure-doc-assistant'
+param appServiceSku = 'F1'
+param postgresPassword = readEnvironmentVariable('POSTGRES_PASSWORD')

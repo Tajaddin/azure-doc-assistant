@@ -1,0 +1,67 @@
+name: deploy
+
+# Deploys code to the Azure resources created by infra/bicep (which is applied once, by hand, with deploy.sh).
+# Signs in with OIDC through the user-assigned identity `id-<name>-deploy`; no Azure secret is stored in GitHub.
+# Manual only: the resources cost money while they exist.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: publish API
+        run: dotnet publish src/DocAssistant.Api -c Release -o out/api
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.API_APP_NAME }}
+          package: out/api
+      - name: publish Function
+        run: dotnet publish src/DocAssistant.Functions -c Release -o out/func
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.FUNCTION_APP_NAME }}
+          package: out/func
+      - name: build web
+        working-directory: web
+        env:
+          VITE_API_BASE: ${{ vars.API_URL }}
+          VITE_AUTH_MODE: entra
+          VITE_ENTRA_CLIENT_ID: ${{ vars.SPA_CLIENT_ID }}
+          VITE_ENTRA_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          VITE_ENTRA_API_SCOPE: ${{ vars.API_SCOPE }}
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          action: upload
+          app_location: web/dist
+          skip_app_build: true
+          skip_api_build: true
+      - name: smoke test
+        run: |
+          curl -fsS "${{ vars.API_URL }}/healthz"
+          curl -fsS "${{ vars.API_URL }}/readyz"

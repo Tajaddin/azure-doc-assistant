@@ -1,0 +1,167 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  dotnet:
+    name: build, format, unit and integration tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet restore
+      - run: dotnet format --verify-no-changes --no-restore
+      - run: dotnet build -c Release --no-restore
+      - name: unit tests
+        run: dotnet test tests/DocAssistant.UnitTests -c Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults/unit
+      - name: integration tests (Testcontainers: pgvector + Azurite)
+        run: dotnet test tests/DocAssistant.IntegrationTests -c Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults/integration
+      - name: coverage report
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.4.8
+          reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage -reporttypes:"MarkdownSummaryGithub;Cobertura" -assemblyfilters:"+DocAssistant.Core;+DocAssistant.Infrastructure;+DocAssistant.Api;+DocAssistant.Worker"
+          cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          LINE=$(grep -oP 'line-rate="\K[0-9.]+' coverage/Cobertura.xml | head -1)
+          echo "line coverage: $LINE"
+          awk -v r="$LINE" 'BEGIN { if (r + 0 < 0.65) { print "coverage below 65%"; exit 1 } }'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+
+  web:
+    name: web lint, types, unit tests, build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+  e2e:
+    name: end to end (compose, fake model, Playwright)
+    runs-on: ubuntu-24.04
+    needs: [dotnet, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: synthetic corpus
+        run: dotnet run --project tools/DocAssistant.SynthData -c Release -- --out data/synthetic --questions evals/questions.json
+      - name: start the stack with the deterministic model
+        run: |
+          cp .env.example .env
+          AI_PROVIDER=fake docker compose up -d --build api worker postgres azurite
+          for i in $(seq 1 60); do curl -fsS http://localhost:8080/readyz && break || sleep 2; done
+          curl -fsS http://localhost:8080/readyz
+      - name: fake-model eval gate through the API
+        run: dotnet run --project tools/DocAssistant.Evals -c Release -- --api http://localhost:8080 --label fake --gate
+      - name: Playwright
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          API_BASE=http://localhost:8080 npx playwright test   # builds the web app with the API base baked in
+      - name: logs on failure
+        if: failure()
+        run: docker compose logs --no-color api worker | tail -200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report
+          path: |
+            web/playwright-report
+            evals/results
+      - if: always()
+        run: docker compose down -v
+
+  alerts:
+    name: alert rule unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker run --rm -v "$PWD/observability:/w" -w /w --entrypoint promtool prom/prometheus:v3.5.0 check rules alert_rules.yml
+          docker run --rm -v "$PWD/observability:/w" -w /w --entrypoint promtool prom/prometheus:v3.5.0 test rules alerts_test.yml
+
+  bicep:
+    name: bicep build and lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          az bicep install
+          az bicep build --file infra/bicep/main.bicep --stdout > /dev/null
+          az bicep lint --file infra/bicep/main.bicep
+
+  gitleaks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  images:
+    name: container images build
+    runs-on: ubuntu-24.04
+    needs: [dotnet]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/DocAssistant.Api/Dockerfile
+          push: false
+          tags: docassistant-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/DocAssistant.Worker/Dockerfile
+          push: false
+          tags: docassistant-worker:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
