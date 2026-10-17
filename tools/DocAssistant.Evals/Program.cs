@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -34,7 +35,7 @@ var corpus = SyntheticCorpus.Generate();
 var questions = JsonSerializer.Deserialize<JsonNode>(File.ReadAllText(questionsPath))!["questions"]!.AsArray()
     .Select(q => q!.Deserialize<SyntheticCorpus.EvalQuestion>()!).ToList();
 
-using var http = new HttpClient { BaseAddress = new Uri(api), Timeout = TimeSpan.FromMinutes(5) };
+using var http = new HttpClient(new RetryOn429Handler()) { BaseAddress = new Uri(api), Timeout = TimeSpan.FromMinutes(5) };
 var user = $"eval-{DateTime.UtcNow:yyyyMMddHHmmss}";
 var tokenResp = await http.PostAsJsonAsync("/auth/dev-token", new { user });
 tokenResp.EnsureSuccessStatusCode();
@@ -244,3 +245,33 @@ if (gate)
     Console.WriteLine($"GATE PASSED ({key})");
 }
 return 0;
+
+/// <summary>
+/// The API rate-limits uploads and questions per user (429). The eval waits and retries instead of failing, so it
+/// also runs against an API with production limits; CI raises the limits so timings are not stretched by waits.
+/// </summary>
+internal sealed class RetryOn429Handler : DelegatingHandler
+{
+    private const int MaxAttempts = 8;
+
+    public RetryOn429Handler()
+        : base(new HttpClientHandler())
+    {
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt == MaxAttempts)
+            {
+                return response;
+            }
+            var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(Math.Min(60, 10 * attempt));
+            response.Dispose();
+            await Console.Error.WriteLineAsync($"429 from {request.RequestUri?.AbsolutePath}; retrying in {wait.TotalSeconds:F0} s").ConfigureAwait(false);
+            await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+        }
+    }
+}

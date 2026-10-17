@@ -89,6 +89,10 @@ jobs:
       - name: start the stack with the deterministic model
         run: |
           cp .env.example .env
+          # the eval uploads 28 documents and asks 46 questions in a minute or two; same raised limits as the
+          # local eval runs, so the gate measures the pipeline, not the per-user rate limit
+          echo "UPLOAD_PER_MINUTE=200" >> .env
+          echo "ASK_PER_MINUTE=1000" >> .env
           AI_PROVIDER=fake docker compose up -d --build api worker postgres azurite
           for i in $(seq 1 60); do curl -fsS http://localhost:8080/readyz && break || sleep 2; done
           curl -fsS http://localhost:8080/readyz
