@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/auth.ts","./src/config.ts","./src/main.tsx","./src/sse.test.ts","./src/sse.ts","./src/components/chat.tsx","./src/components/costs.tsx","./src/components/documents.tsx","./e2e/app.spec.ts","./vite.config.ts","./playwright.config.ts"],"version":"5.9.3"}

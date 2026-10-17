@@ -1,0 +1,8 @@
+{
+  "navigationFallback": { "rewrite": "/index.html", "exclude": ["/assets/*", "*.{css,js,svg,png,ico}"] },
+  "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; connect-src 'self' https://*.azurewebsites.net https://login.microsoftonline.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer"
+  }
+}
