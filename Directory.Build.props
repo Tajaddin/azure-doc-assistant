@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Semantic Kernel marks newer connector APIs experimental; the ids below are the ones this solution uses. -->
+    <NoWarn>$(NoWarn);SKEXP0001;SKEXP0010;SKEXP0050;SKEXP0070;CA1848;CA2007;CA1031;CA1054;CA1056;CA1062;CA1303;CA1812;CA1822;CA1859;CA1860;CA1861;CA2254;CA5394;CA1308;CA1305;CA1310;CA1307;CA1311</NoWarn>
+    <Authors>Tajaddin Gafarov</Authors>
+    <Company />
+    <Copyright>Copyright (c) 2026 Tajaddin Gafarov</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Tajaddin/azure-doc-assistant</RepositoryUrl>
+  </PropertyGroup>
+</Project>

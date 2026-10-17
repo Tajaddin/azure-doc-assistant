@@ -1,0 +1,37 @@
+# build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# environments and secrets
+.env
+.env.*
+!.env.example
+local.settings.json
+appsettings.*.local.json
+infra/**/*.bicepparam.local
+infra/**/.deploy/
+
+# web
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+web/e2e/.auth/
+
+# eval and bench scratch
+evals/results/*
+!evals/results/latest-*
+data/synthetic/_tmp/
+
+# editors
+.idea/
+.vscode/
+*.swp
+infra/bicep/main.bicepparam
