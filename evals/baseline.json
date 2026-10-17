@@ -1,0 +1,22 @@
+{
+  "_comment": "Minimums for `DocAssistant.Evals --gate`, keyed by the --label slug ('.' and ':' become '_' and '-'). The fake model quotes the first source, so its gate measures plumbing: every document indexed, top-1 retrieval (the citation rate) and regex extraction. Live-model keys are set from a committed run and only ratcheted up.",
+  "fake": {
+    "documents_ready": 28,
+    "citation_rate": 0.65,
+    "extraction_field_accuracy": 0.95,
+    "pages_per_minute": 60
+  },
+  "ollama-qwen2_5-3b": {
+    "documents_ready": 28,
+    "answer_accuracy": 0.8,
+    "citation_rate": 0.7,
+    "unanswerable_handled": 0.5,
+    "extraction_field_accuracy": 0.95
+  },
+  "default": {
+    "documents_ready": 28,
+    "answer_accuracy": 0.8,
+    "citation_rate": 0.7,
+    "extraction_field_accuracy": 0.9
+  }
+}

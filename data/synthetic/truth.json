@@ -1,0 +1,930 @@
+{
+  "generated_with": "tools/DocAssistant.SynthData (seed 42)",
+  "invoices": [
+    {
+      "file": "INV-1001.pdf",
+      "fields": {
+        "invoice_number": "INV-1001",
+        "invoice_date": "2026-09-05",
+        "due_date": "2026-09-20",
+        "vendor": "Northwind Supply Co.",
+        "customer": "Meridian Dental Partners",
+        "currency": "USD",
+        "subtotal": 355.50,
+        "tax": 24.88,
+        "total": 380.38,
+        "payment_terms": "Net 15",
+        "line_items": [
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 3,
+            "unit_price": 89.00,
+            "amount": 267.00
+          },
+          {
+            "description": "Catering, lunch per head",
+            "quantity": 6,
+            "unit_price": 14.75,
+            "amount": 88.50
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1002.pdf",
+      "fields": {
+        "invoice_number": "INV-1002",
+        "invoice_date": "2026-08-27",
+        "due_date": "2026-09-26",
+        "vendor": "Hillsborough Cleaning Services",
+        "customer": "Acme Retail Group",
+        "currency": "USD",
+        "subtotal": 1500.00,
+        "tax": 105.00,
+        "total": 1605.00,
+        "payment_terms": "Net 30",
+        "line_items": [
+          {
+            "description": "Software licence, per seat",
+            "quantity": 4,
+            "unit_price": 60.00,
+            "amount": 240.00
+          },
+          {
+            "description": "Maintenance visit",
+            "quantity": 7,
+            "unit_price": 180.00,
+            "amount": 1260.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1003.pdf",
+      "fields": {
+        "invoice_number": "INV-1003",
+        "invoice_date": "2026-08-23",
+        "due_date": "2026-10-22",
+        "vendor": "Palmetto Technical Services",
+        "customer": "Cypress Point Hotels",
+        "currency": "USD",
+        "subtotal": 2284.00,
+        "tax": 159.88,
+        "total": 2443.88,
+        "payment_terms": "Net 60",
+        "line_items": [
+          {
+            "description": "Delivery service",
+            "quantity": 1,
+            "unit_price": 35.00,
+            "amount": 35.00
+          },
+          {
+            "description": "Consulting hours",
+            "quantity": 7,
+            "unit_price": 125.00,
+            "amount": 875.00
+          },
+          {
+            "description": "Office chair, mesh",
+            "quantity": 6,
+            "unit_price": 219.00,
+            "amount": 1314.00
+          },
+          {
+            "description": "Software licence, per seat",
+            "quantity": 1,
+            "unit_price": 60.00,
+            "amount": 60.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1004.pdf",
+      "fields": {
+        "invoice_number": "INV-1004",
+        "invoice_date": "2026-09-01",
+        "due_date": "2026-09-16",
+        "vendor": "Northwind Supply Co.",
+        "customer": "Acme Retail Group",
+        "currency": "USD",
+        "subtotal": 819.00,
+        "tax": 57.33,
+        "total": 876.33,
+        "payment_terms": "Net 15",
+        "line_items": [
+          {
+            "description": "Software licence, per seat",
+            "quantity": 10,
+            "unit_price": 60.00,
+            "amount": 600.00
+          },
+          {
+            "description": "Office chair, mesh",
+            "quantity": 1,
+            "unit_price": 219.00,
+            "amount": 219.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1005.pdf",
+      "fields": {
+        "invoice_number": "INV-1005",
+        "invoice_date": "2026-09-04",
+        "due_date": "2026-09-19",
+        "vendor": "Tampa Bay Printworks",
+        "customer": "Harbor Clinic LLC",
+        "currency": "USD",
+        "subtotal": 4237.75,
+        "tax": 296.64,
+        "total": 4534.39,
+        "payment_terms": "Net 15",
+        "line_items": [
+          {
+            "description": "Maintenance visit",
+            "quantity": 10,
+            "unit_price": 180.00,
+            "amount": 1800.00
+          },
+          {
+            "description": "Office chair, mesh",
+            "quantity": 7,
+            "unit_price": 219.00,
+            "amount": 1533.00
+          },
+          {
+            "description": "Software licence, per seat",
+            "quantity": 9,
+            "unit_price": 60.00,
+            "amount": 540.00
+          },
+          {
+            "description": "Catering, lunch per head",
+            "quantity": 1,
+            "unit_price": 14.75,
+            "amount": 14.75
+          },
+          {
+            "description": "Delivery service",
+            "quantity": 10,
+            "unit_price": 35.00,
+            "amount": 350.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1006.pdf",
+      "fields": {
+        "invoice_number": "INV-1006",
+        "invoice_date": "2026-09-10",
+        "due_date": "2026-09-25",
+        "vendor": "Tampa Bay Printworks",
+        "customer": "Cypress Point Hotels",
+        "currency": "USD",
+        "subtotal": 1595.00,
+        "tax": 111.65,
+        "total": 1706.65,
+        "payment_terms": "Net 15",
+        "line_items": [
+          {
+            "description": "Maintenance visit",
+            "quantity": 4,
+            "unit_price": 180.00,
+            "amount": 720.00
+          },
+          {
+            "description": "Consulting hours",
+            "quantity": 7,
+            "unit_price": 125.00,
+            "amount": 875.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1007.pdf",
+      "fields": {
+        "invoice_number": "INV-1007",
+        "invoice_date": "2026-07-03",
+        "due_date": "2026-08-02",
+        "vendor": "Hillsborough Cleaning Services",
+        "customer": "Meridian Dental Partners",
+        "currency": "USD",
+        "subtotal": 4483.00,
+        "tax": 313.81,
+        "total": 4796.81,
+        "payment_terms": "Net 30",
+        "line_items": [
+          {
+            "description": "Copier paper, case of 10 reams",
+            "quantity": 4,
+            "unit_price": 48.50,
+            "amount": 194.00
+          },
+          {
+            "description": "Consulting hours",
+            "quantity": 9,
+            "unit_price": 125.00,
+            "amount": 1125.00
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 10,
+            "unit_price": 310.00,
+            "amount": 3100.00
+          },
+          {
+            "description": "Shipping pallet",
+            "quantity": 1,
+            "unit_price": 22.00,
+            "amount": 22.00
+          },
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 1,
+            "unit_price": 42.00,
+            "amount": 42.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1008.pdf",
+      "fields": {
+        "invoice_number": "INV-1008",
+        "invoice_date": "2026-07-24",
+        "due_date": "2026-09-22",
+        "vendor": "Gulfstream Paper Company",
+        "customer": "Cypress Point Hotels",
+        "currency": "USD",
+        "subtotal": 4069.50,
+        "tax": 284.86,
+        "total": 4354.36,
+        "payment_terms": "Net 60",
+        "line_items": [
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 2,
+            "unit_price": 310.00,
+            "amount": 620.00
+          },
+          {
+            "description": "Office chair, mesh",
+            "quantity": 10,
+            "unit_price": 219.00,
+            "amount": 2190.00
+          },
+          {
+            "description": "Maintenance visit",
+            "quantity": 3,
+            "unit_price": 180.00,
+            "amount": 540.00
+          },
+          {
+            "description": "Cleaning, per visit",
+            "quantity": 4,
+            "unit_price": 95.00,
+            "amount": 380.00
+          },
+          {
+            "description": "Copier paper, case of 10 reams",
+            "quantity": 7,
+            "unit_price": 48.50,
+            "amount": 339.50
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1009.pdf",
+      "fields": {
+        "invoice_number": "INV-1009",
+        "invoice_date": "2026-07-13",
+        "due_date": "2026-08-27",
+        "vendor": "Gulfstream Paper Company",
+        "customer": "Bright Path Schools",
+        "currency": "USD",
+        "subtotal": 1053.00,
+        "tax": 73.71,
+        "total": 1126.71,
+        "payment_terms": "Net 45",
+        "line_items": [
+          {
+            "description": "Shipping pallet",
+            "quantity": 11,
+            "unit_price": 22.00,
+            "amount": 242.00
+          },
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 8,
+            "unit_price": 42.00,
+            "amount": 336.00
+          },
+          {
+            "description": "Cleaning, per visit",
+            "quantity": 5,
+            "unit_price": 95.00,
+            "amount": 475.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1010.pdf",
+      "fields": {
+        "invoice_number": "INV-1010",
+        "invoice_date": "2026-07-13",
+        "due_date": "2026-09-11",
+        "vendor": "Suncoast Office Products",
+        "customer": "Meridian Dental Partners",
+        "currency": "USD",
+        "subtotal": 1711.00,
+        "tax": 119.77,
+        "total": 1830.77,
+        "payment_terms": "Net 60",
+        "line_items": [
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 3,
+            "unit_price": 89.00,
+            "amount": 267.00
+          },
+          {
+            "description": "Cleaning, per visit",
+            "quantity": 10,
+            "unit_price": 95.00,
+            "amount": 950.00
+          },
+          {
+            "description": "Delivery service",
+            "quantity": 8,
+            "unit_price": 35.00,
+            "amount": 280.00
+          },
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 3,
+            "unit_price": 42.00,
+            "amount": 126.00
+          },
+          {
+            "description": "Shipping pallet",
+            "quantity": 4,
+            "unit_price": 22.00,
+            "amount": 88.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1011.pdf",
+      "fields": {
+        "invoice_number": "INV-1011",
+        "invoice_date": "2026-09-03",
+        "due_date": "2026-09-18",
+        "vendor": "Hillsborough Cleaning Services",
+        "customer": "Harbor Clinic LLC",
+        "currency": "USD",
+        "subtotal": 775.50,
+        "tax": 54.28,
+        "total": 829.78,
+        "payment_terms": "Net 15",
+        "line_items": [
+          {
+            "description": "Cleaning, per visit",
+            "quantity": 6,
+            "unit_price": 95.00,
+            "amount": 570.00
+          },
+          {
+            "description": "Shipping pallet",
+            "quantity": 8,
+            "unit_price": 22.00,
+            "amount": 176.00
+          },
+          {
+            "description": "Catering, lunch per head",
+            "quantity": 2,
+            "unit_price": 14.75,
+            "amount": 29.50
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1012.pdf",
+      "fields": {
+        "invoice_number": "INV-1012",
+        "invoice_date": "2026-08-22",
+        "due_date": "2026-10-06",
+        "vendor": "Bayline Logistics LLC",
+        "customer": "Bright Path Schools",
+        "currency": "USD",
+        "subtotal": 1461.50,
+        "tax": 102.30,
+        "total": 1563.80,
+        "payment_terms": "Net 45",
+        "line_items": [
+          {
+            "description": "Catering, lunch per head",
+            "quantity": 10,
+            "unit_price": 14.75,
+            "amount": 147.50
+          },
+          {
+            "description": "Office chair, mesh",
+            "quantity": 6,
+            "unit_price": 219.00,
+            "amount": 1314.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1013.pdf",
+      "fields": {
+        "invoice_number": "INV-1013",
+        "invoice_date": "2026-09-15",
+        "due_date": "2026-10-30",
+        "vendor": "Bayline Logistics LLC",
+        "customer": "Bright Path Schools",
+        "currency": "USD",
+        "subtotal": 2688.00,
+        "tax": 188.16,
+        "total": 2876.16,
+        "payment_terms": "Net 45",
+        "line_items": [
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 4,
+            "unit_price": 42.00,
+            "amount": 168.00
+          },
+          {
+            "description": "Consulting hours",
+            "quantity": 11,
+            "unit_price": 125.00,
+            "amount": 1375.00
+          },
+          {
+            "description": "Delivery service",
+            "quantity": 10,
+            "unit_price": 35.00,
+            "amount": 350.00
+          },
+          {
+            "description": "Copier paper, case of 10 reams",
+            "quantity": 10,
+            "unit_price": 48.50,
+            "amount": 485.00
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 1,
+            "unit_price": 310.00,
+            "amount": 310.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1014.pdf",
+      "fields": {
+        "invoice_number": "INV-1014",
+        "invoice_date": "2026-07-02",
+        "due_date": "2026-08-31",
+        "vendor": "Gulfstream Paper Company",
+        "customer": "Cypress Point Hotels",
+        "currency": "USD",
+        "subtotal": 1638.00,
+        "tax": 114.66,
+        "total": 1752.66,
+        "payment_terms": "Net 60",
+        "line_items": [
+          {
+            "description": "Office chair, mesh",
+            "quantity": 5,
+            "unit_price": 219.00,
+            "amount": 1095.00
+          },
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 4,
+            "unit_price": 42.00,
+            "amount": 168.00
+          },
+          {
+            "description": "Consulting hours",
+            "quantity": 3,
+            "unit_price": 125.00,
+            "amount": 375.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1015.pdf",
+      "fields": {
+        "invoice_number": "INV-1015",
+        "invoice_date": "2026-08-30",
+        "due_date": "2026-09-29",
+        "vendor": "Suncoast Office Products",
+        "customer": "Cypress Point Hotels",
+        "currency": "USD",
+        "subtotal": 1485.50,
+        "tax": 103.98,
+        "total": 1589.48,
+        "payment_terms": "Net 30",
+        "line_items": [
+          {
+            "description": "Office chair, mesh",
+            "quantity": 2,
+            "unit_price": 219.00,
+            "amount": 438.00
+          },
+          {
+            "description": "Copier paper, case of 10 reams",
+            "quantity": 11,
+            "unit_price": 48.50,
+            "amount": 533.50
+          },
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 2,
+            "unit_price": 89.00,
+            "amount": 178.00
+          },
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 8,
+            "unit_price": 42.00,
+            "amount": 336.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1016.pdf",
+      "fields": {
+        "invoice_number": "INV-1016",
+        "invoice_date": "2026-09-04",
+        "due_date": "2026-11-03",
+        "vendor": "Hillsborough Cleaning Services",
+        "customer": "Cypress Point Hotels",
+        "currency": "USD",
+        "subtotal": 1289.00,
+        "tax": 90.23,
+        "total": 1379.23,
+        "payment_terms": "Net 60",
+        "line_items": [
+          {
+            "description": "Consulting hours",
+            "quantity": 3,
+            "unit_price": 125.00,
+            "amount": 375.00
+          },
+          {
+            "description": "Cleaning, per visit",
+            "quantity": 4,
+            "unit_price": 95.00,
+            "amount": 380.00
+          },
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 6,
+            "unit_price": 89.00,
+            "amount": 534.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1017.pdf",
+      "fields": {
+        "invoice_number": "INV-1017",
+        "invoice_date": "2026-08-01",
+        "due_date": "2026-09-15",
+        "vendor": "Northwind Supply Co.",
+        "customer": "Acme Retail Group",
+        "currency": "USD",
+        "subtotal": 3121.75,
+        "tax": 218.52,
+        "total": 3340.27,
+        "payment_terms": "Net 45",
+        "line_items": [
+          {
+            "description": "Shipping pallet",
+            "quantity": 6,
+            "unit_price": 22.00,
+            "amount": 132.00
+          },
+          {
+            "description": "Maintenance visit",
+            "quantity": 4,
+            "unit_price": 180.00,
+            "amount": 720.00
+          },
+          {
+            "description": "Network switch, 24-port",
+            "quantity": 6,
+            "unit_price": 310.00,
+            "amount": 1860.00
+          },
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 8,
+            "unit_price": 42.00,
+            "amount": 336.00
+          },
+          {
+            "description": "Catering, lunch per head",
+            "quantity": 5,
+            "unit_price": 14.75,
+            "amount": 73.75
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1018.pdf",
+      "fields": {
+        "invoice_number": "INV-1018",
+        "invoice_date": "2026-09-18",
+        "due_date": "2026-10-18",
+        "vendor": "Palmetto Technical Services",
+        "customer": "Acme Retail Group",
+        "currency": "USD",
+        "subtotal": 1497.00,
+        "tax": 104.79,
+        "total": 1601.79,
+        "payment_terms": "Net 30",
+        "line_items": [
+          {
+            "description": "Shipping pallet",
+            "quantity": 10,
+            "unit_price": 22.00,
+            "amount": 220.00
+          },
+          {
+            "description": "Software licence, per seat",
+            "quantity": 7,
+            "unit_price": 60.00,
+            "amount": 420.00
+          },
+          {
+            "description": "Delivery service",
+            "quantity": 11,
+            "unit_price": 35.00,
+            "amount": 385.00
+          },
+          {
+            "description": "Banner printing, per unit",
+            "quantity": 7,
+            "unit_price": 42.00,
+            "amount": 294.00
+          },
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 2,
+            "unit_price": 89.00,
+            "amount": 178.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1019.pdf",
+      "fields": {
+        "invoice_number": "INV-1019",
+        "invoice_date": "2026-08-07",
+        "due_date": "2026-08-22",
+        "vendor": "Orange Grove Catering",
+        "customer": "Acme Retail Group",
+        "currency": "USD",
+        "subtotal": 184.00,
+        "tax": 12.88,
+        "total": 196.88,
+        "payment_terms": "Net 15",
+        "line_items": [
+          {
+            "description": "Toner cartridge, black",
+            "quantity": 1,
+            "unit_price": 89.00,
+            "amount": 89.00
+          },
+          {
+            "description": "Cleaning, per visit",
+            "quantity": 1,
+            "unit_price": 95.00,
+            "amount": 95.00
+          }
+        ]
+      }
+    },
+    {
+      "file": "INV-1020.pdf",
+      "fields": {
+        "invoice_number": "INV-1020",
+        "invoice_date": "2026-08-23",
+        "due_date": "2026-10-22",
+        "vendor": "Suncoast Office Products",
+        "customer": "Cypress Point Hotels",
+        "currency": "USD",
+        "subtotal": 1322.75,
+        "tax": 92.59,
+        "total": 1415.34,
+        "payment_terms": "Net 60",
+        "line_items": [
+          {
+            "description": "Maintenance visit",
+            "quantity": 1,
+            "unit_price": 180.00,
+            "amount": 180.00
+          },
+          {
+            "description": "Catering, lunch per head",
+            "quantity": 9,
+            "unit_price": 14.75,
+            "amount": 132.75
+          },
+          {
+            "description": "Software licence, per seat",
+            "quantity": 11,
+            "unit_price": 60.00,
+            "amount": 660.00
+          },
+          {
+            "description": "Delivery service",
+            "quantity": 10,
+            "unit_price": 35.00,
+            "amount": 350.00
+          }
+        ]
+      }
+    }
+  ],
+  "contracts": [
+    {
+      "file_name": "MSA-Northwind-Acme.pdf",
+      "provider": "Northwind Supply Co.",
+      "client": "Acme Retail Group",
+      "effective_date": "2026-01-15",
+      "term_months": 12,
+      "payment_terms": "Net 30",
+      "termination_notice_days": 30,
+      "governing_law": "the State of Florida",
+      "liability_cap_usd": 50000,
+      "sla_percent": 99.5,
+      "monthly_fee_usd": 1250
+    },
+    {
+      "file_name": "MSA-Palmetto-Harbor.pdf",
+      "provider": "Palmetto Technical Services",
+      "client": "Harbor Clinic LLC",
+      "effective_date": "2026-02-15",
+      "term_months": 24,
+      "payment_terms": "Net 45",
+      "termination_notice_days": 60,
+      "governing_law": "the State of Georgia",
+      "liability_cap_usd": 100000,
+      "sla_percent": 99.9,
+      "monthly_fee_usd": 1625
+    },
+    {
+      "file_name": "MSA-Hillsborough-Bright.pdf",
+      "provider": "Hillsborough Cleaning Services",
+      "client": "Bright Path Schools",
+      "effective_date": "2026-03-15",
+      "term_months": 36,
+      "payment_terms": "Net 60",
+      "termination_notice_days": 90,
+      "governing_law": "the State of Delaware",
+      "liability_cap_usd": 150000,
+      "sla_percent": 99.0,
+      "monthly_fee_usd": 2000
+    },
+    {
+      "file_name": "MSA-Suncoast-Cypress.pdf",
+      "provider": "Suncoast Office Products",
+      "client": "Cypress Point Hotels",
+      "effective_date": "2026-04-15",
+      "term_months": 12,
+      "payment_terms": "Net 30",
+      "termination_notice_days": 30,
+      "governing_law": "the State of Texas",
+      "liability_cap_usd": 200000,
+      "sla_percent": 99.5,
+      "monthly_fee_usd": 2375
+    },
+    {
+      "file_name": "MSA-Gulfstream-Meridian.pdf",
+      "provider": "Gulfstream Paper Company",
+      "client": "Meridian Dental Partners",
+      "effective_date": "2026-05-15",
+      "term_months": 24,
+      "payment_terms": "Net 45",
+      "termination_notice_days": 60,
+      "governing_law": "the State of New York",
+      "liability_cap_usd": 250000,
+      "sla_percent": 99.9,
+      "monthly_fee_usd": 2750
+    }
+  ],
+  "manuals": [
+    {
+      "file_name": "Manual-DH-200.pdf",
+      "product": "Dehumidifier",
+      "model": "DH-200",
+      "power_watts": 350,
+      "capacity_pints_per_day": 50,
+      "min_temp_c": 5,
+      "max_temp_c": 32,
+      "filter_months": 3,
+      "warranty_years": 2,
+      "weight_kg": 14.5,
+      "error_codes": [
+        {
+          "code": "E1",
+          "meaning": "the water tank is full or missing"
+        },
+        {
+          "code": "E2",
+          "meaning": "the room temperature is outside the operating range"
+        },
+        {
+          "code": "E3",
+          "meaning": "the filter needs cleaning or replacement"
+        },
+        {
+          "code": "E4",
+          "meaning": "the humidity sensor has failed"
+        }
+      ]
+    },
+    {
+      "file_name": "Manual-AP-450.pdf",
+      "product": "Air Purifier",
+      "model": "AP-450",
+      "power_watts": 60,
+      "capacity_pints_per_day": 0,
+      "min_temp_c": 5,
+      "max_temp_c": 40,
+      "filter_months": 6,
+      "warranty_years": 3,
+      "weight_kg": 6.2,
+      "error_codes": [
+        {
+          "code": "E1",
+          "meaning": "the water tank is full or missing"
+        },
+        {
+          "code": "E2",
+          "meaning": "the room temperature is outside the operating range"
+        },
+        {
+          "code": "E3",
+          "meaning": "the filter needs cleaning or replacement"
+        },
+        {
+          "code": "E4",
+          "meaning": "the humidity sensor has failed"
+        }
+      ]
+    },
+    {
+      "file_name": "Manual-SH-1500.pdf",
+      "product": "Space Heater",
+      "model": "SH-1500",
+      "power_watts": 1500,
+      "capacity_pints_per_day": 0,
+      "min_temp_c": 5,
+      "max_temp_c": 30,
+      "filter_months": 12,
+      "warranty_years": 1,
+      "weight_kg": 3.8,
+      "error_codes": [
+        {
+          "code": "E1",
+          "meaning": "the water tank is full or missing"
+        },
+        {
+          "code": "E2",
+          "meaning": "the room temperature is outside the operating range"
+        },
+        {
+          "code": "E3",
+          "meaning": "the filter needs cleaning or replacement"
+        },
+        {
+          "code": "E4",
+          "meaning": "the humidity sensor has failed"
+        }
+      ]
+    }
+  ]
+}
