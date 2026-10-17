@@ -1,28 +1,44 @@
+# One grouped pull request per ecosystem per month: enough to stay current without a queue of
+# single-package PRs, each running the full CI.
 version: 2
 updates:
-  - package-ecosystem: nuget
-    directory: /
-    schedule:
-      interval: weekly
-    groups:
-      dotnet:
-        patterns: ["*"]
-  - package-ecosystem: npm
-    directory: /web
-    schedule:
-      interval: weekly
-    groups:
-      web:
-        patterns: ["*"]
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /src/DocAssistant.Api
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /src/DocAssistant.Worker
-    schedule:
-      interval: weekly
+- package-ecosystem: nuget
+  directory: /
+  schedule:
+    interval: monthly
+  groups:
+    nuget:
+      patterns:
+      - '*'
+- package-ecosystem: npm
+  directory: /web
+  schedule:
+    interval: monthly
+  groups:
+    npm:
+      patterns:
+      - '*'
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: monthly
+  groups:
+    github_actions:
+      patterns:
+      - '*'
+- package-ecosystem: docker
+  directory: /src/DocAssistant.Api
+  schedule:
+    interval: monthly
+  groups:
+    docker_src_docassistant_api:
+      patterns:
+      - '*'
+- package-ecosystem: docker
+  directory: /src/DocAssistant.Worker
+  schedule:
+    interval: monthly
+  groups:
+    docker_src_docassistant_worker:
+      patterns:
+      - '*'
