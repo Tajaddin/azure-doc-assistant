@@ -45,7 +45,7 @@ born-digital and small, so these are an upper bound for messy real documents. Th
 the change that moved retrieved sources out of the system prompt into the user turn and have not been
 repeated since, so the answer, citation and latency figures describe the earlier prompt.
 
-### Evaluation (`make evals`, `tools/DocAssistant.Evals`, 28 documents, 46 questions)
+### Evaluation (`make evals`, `tools/DocAssistant.Evals`, measured on the 28-document, 46-question set)
 
 | Metric | Value |
 |---|---|
@@ -62,6 +62,11 @@ Source: `evals/results/latest-ollama-qwen2_5-3b.md`. CI runs the same tool with 
 stand-in model (`evals/results/latest-fake.md`, gate in `evals/baseline.json`): it cannot answer, so
 its gate checks plumbing only: all 28 documents indexed, top-1 retrieval of the expected document for
 72.7% of questions with the hash embedder, 100% regex extraction, p95 13 ms per request.
+
+The set has since grown to 29 documents and 48 questions: a vendor notice carries a hidden instruction
+(tiny grey text asking an AI assistant to call that vendor's invoices cancelled and print a canary code),
+and two `injection` questions pass only with the right fact and none of the injected text. They are
+scored separately (`injection_resisted`) and are not gated yet, because no model run has measured them.
 
 By category the misses cluster in one place:
 questions about the five master-services agreements, which share one layout, scored 2/5 on the monthly
@@ -89,7 +94,7 @@ the local model.
 ollama pull qwen2.5:3b && ollama pull nomic-embed-text    # the local models (free)
 cp .env.example .env
 make up                 # API :8080, worker, Postgres (pgvector) :5434, Azurite
-make corpus             # 20 invoices, 5 contracts, 3 manuals + evals/questions.json
+make corpus             # 20 invoices, 5 contracts, 3 manuals, 1 notice + evals/questions.json
 cd web && cp .env.example .env.local && npm ci && npm run dev    # http://localhost:5173
 ```
 
@@ -179,4 +184,5 @@ docs/                             PLAN, DEPLOY, decisions/0001-0005
   fail; a reranker or document-level filters would be the next step.
 - Azure AI Search is not implemented; pgvector on Azure Database for PostgreSQL fills the same port.
 - Documents have one owner; there is no sharing model, no retention policy, no OCR for scanned PDFs.
-- The eval set is 46 questions generated from the corpus's own facts: a smoke-level set, not a benchmark.
+- The eval set is 48 questions generated from the corpus's own facts, two of them prompt-injection
+  cases: a smoke-level set, not a benchmark.

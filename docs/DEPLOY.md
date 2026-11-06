@@ -21,7 +21,7 @@ Sign in with any test user name; the API mints a development token. Upload PDFs 
 cp .env.example .env
 make up            # api :8080, worker, postgres :5434, azurite; model = Ollama on the host
 make up-obs        # + otel-collector, tempo, prometheus :9092, alertmanager :9095, grafana :3003
-make evals LABEL=ollama-qwen3.5-4b   # uploads the corpus, asks 46 questions, extracts 20 invoices, writes evals/results
+make evals LABEL=ollama-qwen3.5-4b   # uploads the corpus, asks 48 questions, extracts 20 invoices, writes evals/results
 make e2e           # Playwright against the running stack
 make down
 ```

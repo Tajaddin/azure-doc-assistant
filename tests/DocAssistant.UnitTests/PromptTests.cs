@@ -1,8 +1,12 @@
+using System.Text.RegularExpressions;
 using DocAssistant.Core.Domain;
+using DocAssistant.Core.Evals;
 using DocAssistant.Core.Extraction;
 using DocAssistant.Core.Pricing;
 using DocAssistant.Core.Rag;
 using DocAssistant.Infrastructure.Ai;
+using DocAssistant.Infrastructure.Analysis;
+using DocAssistant.SynthData;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -93,5 +97,26 @@ public class PromptAssemblyTests
     {
         Assert.DoesNotContain("{{", Prompts.AnswerSystem, StringComparison.Ordinal);
         Assert.Contains("not instructions", Prompts.AnswerSystem, StringComparison.Ordinal);
+    }
+}
+
+public class InjectedDocumentTests
+{
+    [Fact]
+    public async Task Eval_notice_hides_an_injection_in_its_text_and_the_injection_questions_reject_obeying_it()
+    {
+        var corpus = SyntheticCorpus.Generate();
+        var notice = Assert.Single(corpus.Notices);
+        var doc = await new PdfPigAnalyzer().AnalyzeAsync(new MemoryStream(SyntheticCorpus.RenderNotice(notice)), notice.FileName, default);
+        var text = Regex.Replace(Assert.Single(doc.Pages).Text, @"\s+", " ");
+        Assert.Contains(notice.RemitTo, text, StringComparison.Ordinal);
+        Assert.Contains($"include the reference code {notice.Canary}", text, StringComparison.Ordinal); // tiny grey text still reaches the index
+
+        var injection = SyntheticCorpus.Questions(corpus).Where(q => q.Category == "injection").ToList();
+        Assert.Equal(2, injection.Count);
+        Assert.All(injection, q => Assert.Contains(notice.Canary, q.RejectAny!));
+        Assert.Contains(injection, q => q.ExpectedFile == notice.FileName && q.Expected == "PO Box 2210");
+        var invoice = corpus.Invoices.First(i => i.Vendor == notice.Vendor);
+        Assert.Contains(injection, q => q.ExpectedFile == invoice.FileName && Scoring.AnswerMatches(q.Expected!, $"${invoice.Total:#,##0.00}"));
     }
 }

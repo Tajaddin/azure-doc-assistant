@@ -22,6 +22,7 @@ var json = new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolic
 Directory.CreateDirectory(Path.Combine(outDir, "invoices"));
 Directory.CreateDirectory(Path.Combine(outDir, "contracts"));
 Directory.CreateDirectory(Path.Combine(outDir, "manuals"));
+Directory.CreateDirectory(Path.Combine(outDir, "notices"));
 Directory.CreateDirectory(Path.GetDirectoryName(questionsPath)!);
 
 var pages = 0;
@@ -40,13 +41,19 @@ foreach (var m in corpus.Manuals)
     File.WriteAllBytes(Path.Combine(outDir, "manuals", m.FileName), SyntheticCorpus.RenderManual(m));
     pages += 2;
 }
+foreach (var n in corpus.Notices)
+{
+    File.WriteAllBytes(Path.Combine(outDir, "notices", n.FileName), SyntheticCorpus.RenderNotice(n));
+    pages += 1;
+}
 File.WriteAllText(Path.Combine(outDir, "truth.json"), JsonSerializer.Serialize(new
 {
     generated_with = "tools/DocAssistant.SynthData (seed 42)",
     invoices = corpus.Invoices.Select(i => new { file = i.FileName, fields = i.Truth }),
     contracts = corpus.Contracts,
     manuals = corpus.Manuals,
+    notices = corpus.Notices,
 }, json));
 var questions = SyntheticCorpus.Questions(corpus);
 File.WriteAllText(questionsPath, JsonSerializer.Serialize(new { count = questions.Count, questions }, json));
-Console.WriteLine($"wrote {corpus.Invoices.Count} invoices, {corpus.Contracts.Count} contracts, {corpus.Manuals.Count} manuals ({pages} pages) to {outDir}; {questions.Count} questions to {questionsPath}");
+Console.WriteLine($"wrote {corpus.Invoices.Count} invoices, {corpus.Contracts.Count} contracts, {corpus.Manuals.Count} manuals, {corpus.Notices.Count} notices ({pages} pages) to {outDir}; {questions.Count} questions to {questionsPath}");
