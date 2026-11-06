@@ -29,7 +29,8 @@ public sealed class IngestBlobFunction(IngestionPipeline pipeline, IDocumentRepo
         var doc = await documents.GetAsync(ownerId, id, ct);
         if (doc is null)
         {
-            log.LogWarning("no document record for {DocumentId}; the API must create it before the upload", id);
+            // the API writes the record before the blob, so a blob without one was deleted or its upload rolled back
+            log.LogWarning("no document record for {DocumentId}; skipping", id);
             return;
         }
         if (doc.Status == DocumentStatus.Ready)

@@ -89,14 +89,8 @@ public static class EndpointExtensions
             }
             stream.Position = 0;
 
-            var owner = ctx.User.OwnerId();
-            var id = Guid.NewGuid();
-            var blobName = $"{owner}/{id}.pdf";
-            await store.SaveAsync(blobName, stream, "application/pdf", ct);
-            var record = new DocumentRecord(id, owner, safeName, blobName, file.Length, DocumentKind.Unknown, DocumentStatus.Uploaded, 0, 0, DateTimeOffset.UtcNow, null, null);
-            await repo.CreateAsync(record, ct);
-            await queue.EnqueueAsync(new IngestionMessage(id, owner, blobName, safeName), ct);
-            return Results.Accepted($"/api/documents/{id}", record);
+            var record = await StoreUploadAsync(ctx.User.OwnerId(), safeName, stream, file.Length, store, repo, queue, ct);
+            return Results.Accepted($"/api/documents/{record.Id}", record);
         }).RequireRateLimiting("upload").DisableAntiforgery().WithSummary("Upload a PDF; it is indexed asynchronously");
 
         group.MapGet("/", async (HttpContext ctx, IDocumentRepository repo, CancellationToken ct) =>
@@ -147,6 +141,30 @@ public static class EndpointExtensions
             await repo.GetInvoiceFieldsAsync(ctx.User.OwnerId(), id, ct) is { } f
                 ? Results.Ok(new { documentId = id, f.Method, f.Fields })
                 : Results.NotFound());
+    }
+
+    /// <summary>
+    /// Record, then blob, then queue message. The blob trigger fires as soon as the blob exists and looks the
+    /// record up, so the record has to be there first; if the blob write fails the record is removed again.
+    /// </summary>
+    public static async Task<DocumentRecord> StoreUploadAsync(
+        string owner, string fileName, Stream content, long length, IDocumentStore store, IDocumentRepository repo, IIngestionQueue queue, CancellationToken ct)
+    {
+        var id = Guid.NewGuid();
+        var blobName = $"{owner}/{id}.pdf";
+        var record = new DocumentRecord(id, owner, fileName, blobName, length, DocumentKind.Unknown, DocumentStatus.Uploaded, 0, 0, DateTimeOffset.UtcNow, null, null);
+        await repo.CreateAsync(record, ct);
+        try
+        {
+            await store.SaveAsync(blobName, content, "application/pdf", ct);
+        }
+        catch
+        {
+            await repo.DeleteAsync(owner, id, CancellationToken.None);
+            throw;
+        }
+        await queue.EnqueueAsync(new IngestionMessage(id, owner, blobName, fileName), ct);
+        return record;
     }
 
     public static void MapAsk(this WebApplication app)

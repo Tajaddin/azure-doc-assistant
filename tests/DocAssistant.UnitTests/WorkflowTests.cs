@@ -1,3 +1,5 @@
+using DocAssistant.Api.Endpoints;
+using DocAssistant.Core.Abstractions;
 using DocAssistant.Core.Domain;
 using DocAssistant.Core.Extraction;
 using DocAssistant.Core.Ingestion;
@@ -180,5 +182,50 @@ public class WorkflowTests
         Assert.Equal(1, queue.Completed);
         Assert.NotEmpty(index.Items);
         Assert.Contains(Inv.Number, repo.Pages[id][0].Text, StringComparison.Ordinal);
+    }
+}
+
+/// <summary>The blob trigger fires as soon as the blob exists and looks the record up, so the record must come first.</summary>
+public class UploadOrderTests
+{
+    private sealed class RecordingStore(InMemoryRepo repo, bool fail = false) : IDocumentStore
+    {
+        public bool RecordExistedAtSave { get; private set; }
+
+        public Task SaveAsync(string blobName, Stream content, string contentType, CancellationToken ct)
+        {
+            RecordExistedAtSave = repo.Docs.Values.Any(d => d.BlobName == blobName);
+            return fail ? throw new IOException("storage unavailable") : Task.CompletedTask;
+        }
+
+        public Task<Stream> OpenAsync(string blobName, CancellationToken ct) => throw new NotSupportedException();
+        public Task DeleteAsync(string blobName, CancellationToken ct) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Record_is_written_before_the_blob_and_the_message_after_it()
+    {
+        var repo = new InMemoryRepo();
+        var store = new RecordingStore(repo);
+        var queue = new InMemoryQueue();
+        var record = await EndpointExtensions.StoreUploadAsync("gina", "INV-1.pdf", new MemoryStream([1, 2, 3]), 3, store, repo, queue, default);
+
+        Assert.True(store.RecordExistedAtSave);
+        Assert.Equal(DocumentStatus.Uploaded, repo.Docs[record.Id].Status);
+        Assert.Equal($"gina/{record.Id}.pdf", record.BlobName);
+        var queued = await queue.DequeueAsync(default);
+        Assert.Equal(record.Id, queued!.Message.DocumentId);
+    }
+
+    [Fact]
+    public async Task A_failed_blob_write_removes_the_record_and_queues_nothing()
+    {
+        var repo = new InMemoryRepo();
+        var queue = new InMemoryQueue();
+        await Assert.ThrowsAsync<IOException>(() =>
+            EndpointExtensions.StoreUploadAsync("gina", "INV-1.pdf", new MemoryStream([1, 2, 3]), 3, new RecordingStore(repo, fail: true), repo, queue, default));
+
+        Assert.Empty(repo.Docs);
+        Assert.Null(await queue.DequeueAsync(default));
     }
 }
