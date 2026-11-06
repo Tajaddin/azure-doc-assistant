@@ -85,7 +85,7 @@ Bicep CLI); CI runs all of them.
 
 | Check | Result |
 |---|---|
-| Unit tests (`make test-unit`) | 81 passed: chunking (stable chunk ids), citations, scoring, regex and LLM extraction, pricing, usage reading, the fake model, dev tokens, auth start-up rules and the scope policy, PdfPig, the orchestrator with the fake model, prompt assembly (sources as delimited user-turn data) and the injected eval document, the tool loop with a scripted model (executed, bounded, failing tool, cost recorded when the client disconnects), upload ordering, storage clients, the worker loop, Bicep and settings invariants |
+| Unit tests (`make test-unit`) | 90 passed: chunking (stable chunk ids), citations, scoring, regex and LLM extraction, pricing, usage reading, the fake model, dev tokens, auth start-up rules and the scope policy, PdfPig, the orchestrator with the fake model, prompt assembly (sources as delimited user-turn data, no tag can close the block) and the injected eval document, the tool loop with a scripted model (executed, bounded, failing tool, cost recorded when the client disconnects or cancels before the first token), upload ordering and rollback, storage clients, the readiness probe's storage request, the worker loop, Bicep and settings invariants |
 | Integration tests (`make test-integration`, Testcontainers pgvector + Azurite) | 7 passed: health, auth, upload validation, upload-ingest-ask-extract-delete end to end, per-user isolation, SSE stream, rate limit, poison-message handling |
 | Combined line coverage (Core, Infrastructure, Api, Worker) | 67.2% on 2026-10-17 (CI floor 65%) |
 | Web (`web/`) | ESLint, Prettier, `tsc` strict, 3 Vitest tests, Vite build |
@@ -125,8 +125,9 @@ See [docs/DEPLOY.md](docs/DEPLOY.md) for Azure.
 | `GET /healthz`, `GET /readyz`, `GET /metrics`, `/swagger` | Probes, Prometheus, OpenAPI |
 
 Authentication is a bearer token: Entra ID (`Auth:Mode=entra`, Microsoft.Identity.Web) in Azure, a
-development issuer locally; the API refuses to start in dev mode outside the Development environment. The owner id is the token's `oid`; every query is scoped by it. Chat and
-upload endpoints are rate limited per user.
+development issuer locally; the API refuses to start in dev mode outside the Development environment.
+The owner id is the token's `oid`; every query is scoped by it. Chat and upload endpoints are rate
+limited per user.
 
 ## How the answer is produced
 
