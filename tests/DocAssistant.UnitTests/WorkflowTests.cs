@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DocAssistant.Api.Endpoints;
 using DocAssistant.Core.Abstractions;
 using DocAssistant.Core.Domain;
@@ -115,6 +116,45 @@ public class WorkflowTests
         Assert.Equal(("erin", "ask"), (entry.OwnerId, entry.Operation));
         Assert.True(entry.InputTokens > 100, $"round 1's 100 reported tokens plus round 2's estimated prompt, got {entry.InputTokens}");
         Assert.True(entry.OutputTokens >= 20, $"got {entry.OutputTokens}");
+    }
+
+    /// <summary>Takes the request, then sends nothing until the caller gives up.</summary>
+    private sealed class SilentChatService : IChatCompletionService
+    {
+        public TaskCompletionSource Called { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IReadOnlyDictionary<string, object?> Attributes { get; } = new Dictionary<string, object?>();
+
+        public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            Called.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+    }
+
+    [Fact]
+    public async Task The_prompt_is_recorded_when_the_request_is_cancelled_before_the_first_token()
+    {
+        var chat = new SilentChatService();
+        var kernel = KernelWith(chat);
+        var (repo, index, _) = Seeded("frank", Inv, InvoiceText);
+        var ledger = new InMemoryLedger();
+        var embedder = new SkEmbedder(kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>(), "hash", 256);
+        var svc = new AskService(kernel, embedder, index, repo, new RegexInvoiceExtractor(), ledger, new ModelPricing(), "scripted", NullLogger<AskService>.Instance);
+        using var cts = new CancellationTokenSource();
+
+        var ask = svc.AskAsync("frank", "What is the total?", null, cts.Token);
+        await chat.Called.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cts.CancelAsync(); // the prompt has been sent; the provider bills it
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ask);
+        var entry = Assert.Single(ledger.Entries);
+        Assert.Equal(("frank", "ask"), (entry.OwnerId, entry.Operation));
+        Assert.True(entry.InputTokens > 0);
+        Assert.Equal(0, entry.OutputTokens);
     }
 
     [Fact]

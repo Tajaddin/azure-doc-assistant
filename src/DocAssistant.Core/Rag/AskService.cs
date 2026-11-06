@@ -96,7 +96,7 @@ public sealed class AskService(
         var answer = new StringBuilder();
         var status = "answered";
         var roundText = new StringBuilder();
-        var streaming = false;
+        var roundOpen = false;
         var finished = false;
         try
         {
@@ -107,9 +107,9 @@ public sealed class AskService(
                 var builder = new FunctionCallContentBuilder();
                 roundText.Clear();
                 IReadOnlyDictionary<string, object?>? lastMeta = null;
+                roundOpen = true; // the prompt is billed once sent, even if no chunk ever arrives
                 await foreach (var update in chat.GetStreamingChatMessageContentsAsync(history, settings, requestKernel, ct))
                 {
-                    streaming = true;
                     if (!string.IsNullOrEmpty(update.Content))
                     {
                         roundText.Append(update.Content);
@@ -121,7 +121,7 @@ public sealed class AskService(
                         lastMeta = update.Metadata;
                     }
                 }
-                streaming = false;
+                roundOpen = false;
                 var roundUsage = UsageReader.FromMetadata(lastMeta, modelName, pricing, PromptText(history), roundText.ToString());
                 usage = usage.Add(roundUsage);
                 roundSpan?.SetTag("tokens.in", roundUsage.InputTokens);
@@ -194,7 +194,7 @@ public sealed class AskService(
         {
             if (!finished)
             {
-                await RecordUnfinishedAsync(ownerId, usage.Add(context.ToolUsage), streaming ? (PromptText(history), roundText.ToString()) : null);
+                await RecordUnfinishedAsync(ownerId, usage.Add(context.ToolUsage), roundOpen ? (PromptText(history), roundText.ToString()) : null);
             }
         }
     }
@@ -204,7 +204,7 @@ public sealed class AskService(
     /// <summary>
     /// The answer did not finish: the client disconnected (the endpoint stops reading), the request was cancelled
     /// or a round failed. The provider billed what it processed, so the ledger still gets it: finished rounds as
-    /// reported, and a round cut off mid-stream estimated from its prompt and the text received so far.
+    /// reported, and a round cut off before or during its stream estimated from its prompt and the text received.
     /// </summary>
     private async Task RecordUnfinishedAsync(string ownerId, UsageInfo usage, (string Prompt, string Text)? openRound)
     {
