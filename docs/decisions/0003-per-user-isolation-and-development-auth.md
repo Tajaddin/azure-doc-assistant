@@ -26,5 +26,8 @@ Entra ID (the posting's environment); locally and in CI there is no tenant.
 - The integration test `Users_cannot_see_each_others_documents` proves the property end to end: a second
   user sees no documents, gets 404 on the first user's ids, and gets no sources or citations when asking.
 - The dev token issuer is a real attack surface if it leaked into production, so it only exists when
-  `Auth:Mode=dev`; the Bicep sets `entra` and the Static Web App build sets `VITE_AUTH_MODE=entra`.
+  `Auth:Mode=dev`, and the API refuses to start in that mode outside the Development environment (an
+  unknown mode or a signing key under 32 bytes also stops start-up). `appsettings.json` selects `entra`;
+  the dev mode and its local signing key live in `appsettings.Development.json`, and compose runs the
+  API as Development. The Bicep sets `entra` and the Static Web App build sets `VITE_AUTH_MODE=entra`.
 - Role- or group-based sharing is not modelled; a document has exactly one owner.

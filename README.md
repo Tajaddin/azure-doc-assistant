@@ -112,7 +112,7 @@ See [docs/DEPLOY.md](docs/DEPLOY.md) for Azure.
 | `GET /healthz`, `GET /readyz`, `GET /metrics`, `/swagger` | Probes, Prometheus, OpenAPI |
 
 Authentication is a bearer token: Entra ID (`Auth:Mode=entra`, Microsoft.Identity.Web) in Azure, a
-development issuer locally. The owner id is the token's `oid`; every query is scoped by it. Chat and
+development issuer locally; the API refuses to start in dev mode outside the Development environment. The owner id is the token's `oid`; every query is scoped by it. Chat and
 upload endpoints are rate limited per user.
 
 ## How the answer is produced

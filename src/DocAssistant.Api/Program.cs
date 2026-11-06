@@ -7,10 +7,7 @@ using DocAssistant.Api.Auth;
 using DocAssistant.Api.Endpoints;
 using DocAssistant.Core.Rag;
 using DocAssistant.Infrastructure;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
-using Microsoft.Identity.Web;
-using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -61,34 +58,8 @@ builder.Services.Configure<JsonOptions>(o =>
 });
 builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(20));
 
-// ---------------------------------------------------------------- auth: Entra ID or dev tokens
-var auth = config.GetSection(AuthOptions.Section).Get<AuthOptions>() ?? new AuthOptions();
-builder.Services.AddSingleton(auth);
-if (auth.Mode == "entra")
-{
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddMicrosoftIdentityWebApi(config.GetSection("AzureAd"));
-}
-else
-{
-    var issuer = new DevTokenIssuer(auth.Dev);
-    builder.Services.AddSingleton(issuer);
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
-    {
-        o.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidIssuer = auth.Dev.Issuer,
-            ValidAudience = auth.Dev.Audience,
-            IssuerSigningKey = issuer.Key,
-            ValidateIssuerSigningKey = true,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30),
-            NameClaimType = "name",
-        };
-        o.MapInboundClaims = false;
-    });
-}
-builder.Services.AddAuthorization();
+// ---------------------------------------------------------------- auth: Entra ID or dev tokens (Development only)
+var auth = builder.Services.AddDocAssistantAuth(config, builder.Environment);
 
 // ---------------------------------------------------------------- rate limiting, per user (per IP before auth)
 builder.Services.AddRateLimiter(o =>

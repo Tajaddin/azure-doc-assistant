@@ -49,7 +49,7 @@ public static class EndpointExtensions
 
     public static void MapAuth(this WebApplication app, AuthOptions auth)
     {
-        if (auth.Mode != "dev")
+        if (auth.Mode != AuthOptions.DevMode)
         {
             return;
         }
