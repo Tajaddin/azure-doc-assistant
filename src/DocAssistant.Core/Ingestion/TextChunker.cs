@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Security.Cryptography;
 using System.Text;
 using DocAssistant.Core.Domain;
 
@@ -22,10 +24,22 @@ public sealed class TextChunker
         {
             foreach (var text in SplitPage(page.Text))
             {
-                chunks.Add(new Chunk(Guid.NewGuid(), documentId, ownerId, page.Number, ordinal++, text));
+                chunks.Add(new Chunk(ChunkId(documentId, ordinal), documentId, ownerId, page.Number, ordinal++, text));
             }
         }
         return chunks;
+    }
+
+    /// <summary>
+    /// Derived from the document and the chunk's position, so ingesting a document again (a retried message, or
+    /// two runs at once) upserts the same rows instead of adding a second copy of every chunk.
+    /// </summary>
+    public static Guid ChunkId(Guid documentId, int ordinal)
+    {
+        Span<byte> key = stackalloc byte[20];
+        documentId.TryWriteBytes(key);
+        BinaryPrimitives.WriteInt32BigEndian(key[16..], ordinal);
+        return new Guid(SHA256.HashData(key).AsSpan(0, 16));
     }
 
     public IReadOnlyList<string> SplitPage(string text)
