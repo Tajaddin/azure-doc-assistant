@@ -62,13 +62,7 @@ public class AuthRegistrationTests
     [Fact]
     public void Committed_settings_select_dev_auth_only_in_development()
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DocAssistant.slnx")))
-        {
-            dir = dir.Parent;
-        }
-        Assert.NotNull(dir);
-        var api = Path.Combine(dir.FullName, "src", "DocAssistant.Api");
+        var api = Path.Combine(RepoFiles.Root, "src", "DocAssistant.Api");
         IConfiguration Settings(string environment) => new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(api, "appsettings.json"))
             .AddJsonFile(Path.Combine(api, $"appsettings.{environment}.json"), optional: true)

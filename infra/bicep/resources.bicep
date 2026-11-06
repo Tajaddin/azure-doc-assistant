@@ -38,12 +38,14 @@ resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-0
   tags: tags
 }
 
+// The deploy job runs in the `production` environment, so GitHub's OIDC subject names the environment, not
+// the branch. Restrict who can run it with that environment's protection rules.
 resource githubFederation 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: deployIdentity
-  name: 'github-main'
+  name: 'github-production'
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${githubRepository}:ref:refs/heads/main'
+    subject: 'repo:${githubRepository}:environment:production'
     audiences: ['api://AzureADTokenExchange']
   }
 }

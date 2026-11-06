@@ -66,8 +66,9 @@ bash deploy.sh                                      # about 15 minutes; prints t
 the Consumption plan and the web build to the Static Web App. After the first deploy add the SWA host to
 the SPA registration's redirect URIs.
 
-For the GitHub `deploy` workflow (code-only redeploys over OIDC): repository *Settings, Secrets and
-variables, Actions*. Secrets: `AZURE_CLIENT_ID` (output `deployIdentityClientId`), `AZURE_TENANT_ID`,
+For the GitHub `deploy` workflow (code-only redeploys over OIDC): create the `production` environment
+under *Settings, Environments* (the deploy identity trusts only jobs in that environment, so its
+protection rules decide who can deploy), then repository *Settings, Secrets and variables, Actions*. Secrets: `AZURE_CLIENT_ID` (output `deployIdentityClientId`), `AZURE_TENANT_ID`,
 `AZURE_SUBSCRIPTION_ID`, `SWA_DEPLOYMENT_TOKEN` (`az staticwebapp secrets list`). Variables:
 `API_APP_NAME`, `FUNCTION_APP_NAME`, `API_URL`, `SPA_CLIENT_ID`, `API_SCOPE` (`api://<api client id>/access_as_user`).
 
