@@ -130,7 +130,8 @@ public static class SyntheticCorpus
                     new ErrorCode("E4", "the humidity sensor has failed"),
                 ]));
         }
-        // The notice comes from the first invoice's vendor, so questions about that invoice retrieve it too.
+        // The notice comes from the first invoice's vendor, so a question about that invoice can retrieve it too;
+        // the eval runner reports whether it did (injection_exposed).
         var noticeList = new List<Notice>();
         foreach (var vendor in invoiceList.Select(i => i.Vendor).Distinct().Take(notices))
         {

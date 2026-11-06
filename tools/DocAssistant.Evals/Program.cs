@@ -111,6 +111,7 @@ foreach (var q in questions)
     var citations = answer["citations"]!.AsArray().Select(c => new Citation(
         c!["marker"]!.GetValue<int>(), Guid.Parse(c["documentId"]!.GetValue<string>()), c["fileName"]!.GetValue<string>(),
         c["page"]!.GetValue<int>(), Guid.Parse(c["chunkId"]!.GetValue<string>()), c["snippet"]!.GetValue<string>())).ToList();
+    var sourceFiles = answer["sources"]!.AsArray().Select(s => s!["fileName"]!.GetValue<string>()).Distinct().ToList();
     bool correct;
     if (q.Category == "unanswerable")
     {
@@ -142,6 +143,7 @@ foreach (var q in questions)
         ["correct"] = correct,
         ["cited_expected"] = citedExpected,
         ["citations"] = citations.Count,
+        ["source_files"] = sourceFiles,
         ["tool_calls"] = answer["toolCalls"]!.AsArray().Select(t => t!.GetValue<string>()).ToList(),
         ["latency_ms"] = Math.Round(sw.Elapsed.TotalMilliseconds),
         ["input_tokens"] = usage["inputTokens"]!.GetValue<int>(),
@@ -182,6 +184,9 @@ foreach (var inv in corpus.Invoices)
 var answerable = rows.Where(r => (string)r["category"]! is not ("unanswerable" or "injection")).ToList();
 var unanswerable = rows.Where(r => (string)r["category"]! == "unanswerable").ToList();
 var injection = rows.Where(r => (string)r["category"]! == "injection").ToList();
+// an injection question only tests resistance if the injected notice was among the sources the model saw
+var noticeFiles = corpus.Notices.Select(n => n.FileName).ToHashSet();
+var injectionExposed = injection.Count(r => r.TryGetValue("source_files", out var f) && ((List<string>)f!).Any(noticeFiles.Contains));
 double Rate(IEnumerable<Dictionary<string, object?>> rs, string key) => rs.Any() ? rs.Count(r => r[key] is true) / (double)rs.Count() : 0;
 var fieldsOk = extraction.Sum(e => e.TryGetValue("correct_fields", out var v) ? (int)v! : 0);
 var fieldsAll = extraction.Sum(e => e.TryGetValue("total_fields", out var v) ? (int)v! : 0);
@@ -196,6 +201,7 @@ var summary = new Dictionary<string, object?>
     ["unanswerable_n"] = unanswerable.Count,
     ["injection_resisted"] = Math.Round(Rate(injection, "correct"), 4),
     ["injection_n"] = injection.Count,
+    ["injection_exposed"] = injectionExposed,
     ["by_category"] = rows.GroupBy(r => (string)r["category"]!).ToDictionary(g => g.Key, g => Math.Round(Rate(g, "correct"), 4)),
     ["latency_p50_ms"] = Math.Round(Scoring.Percentile(latencies, 0.5)),
     ["latency_p95_ms"] = Math.Round(Scoring.Percentile(latencies, 0.95)),
@@ -222,7 +228,7 @@ md.AppendLine(CultureInfo.InvariantCulture, $"| Run (UTC) | {report.run_utc} |")
 md.AppendLine(CultureInfo.InvariantCulture, $"| Answer accuracy (n={answerable.Count}) | {(double)summary["answer_accuracy"]!:P1} |");
 md.AppendLine(CultureInfo.InvariantCulture, $"| Citation rate (cites the expected document) | {(double)summary["citation_rate"]!:P1} |");
 md.AppendLine(CultureInfo.InvariantCulture, $"| Unanswerable handled (n={unanswerable.Count}) | {(double)summary["unanswerable_handled"]!:P1} |");
-md.AppendLine(CultureInfo.InvariantCulture, $"| Prompt injection resisted: right fact, no injected text (n={injection.Count}) | {(double)summary["injection_resisted"]!:P1} |");
+md.AppendLine(CultureInfo.InvariantCulture, $"| Prompt injection resisted: right fact, no injected text (n={injection.Count}, notice retrieved for {injectionExposed}) | {(double)summary["injection_resisted"]!:P1} |");
 md.AppendLine(CultureInfo.InvariantCulture, $"| Invoice extraction field accuracy | {(double)summary["extraction_field_accuracy"]!:P1} ({summary["extraction_fields"]}) |");
 md.AppendLine(CultureInfo.InvariantCulture, $"| Latency p50 / p95 | {summary["latency_p50_ms"]} ms / {summary["latency_p95_ms"]} ms |");
 md.AppendLine(CultureInfo.InvariantCulture, $"| Tool calls | {summary["tool_calls_total"]} |");
