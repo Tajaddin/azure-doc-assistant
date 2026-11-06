@@ -10,17 +10,17 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace DocAssistant.UnitTests;
 
+internal sealed class Env(string name) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = name;
+    public string ApplicationName { get; set; } = "DocAssistant.Api";
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+}
+
 public class AuthRegistrationTests
 {
     private const string Key = "unit-test-signing-key-0123456789abcdef";
-
-    private sealed class Env(string name) : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = name;
-        public string ApplicationName { get; set; } = "DocAssistant.Api";
-        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
-    }
 
     private static IConfiguration Config(params (string Key, string Value)[] values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values.Select(v => KeyValuePair.Create(v.Key, (string?)v.Value))).Build();
@@ -77,14 +77,6 @@ public class AuthRegistrationTests
 
 public class ApiScopePolicyTests
 {
-    private sealed class Env(string name) : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = name;
-        public string ApplicationName { get; set; } = "DocAssistant.Api";
-        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
-    }
-
     private static async Task<bool> AllowedAsync(string environment, IEnumerable<(string Key, string Value)> settings, ClaimsPrincipal user)
     {
         var services = new ServiceCollection().AddLogging();
