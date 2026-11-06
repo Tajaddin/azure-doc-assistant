@@ -159,10 +159,17 @@ resource pgDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08
   properties: { charset: 'UTF8', collation: 'en_US.utf8' }
 }
 
-// Only the API's and the Function's outbound addresses may connect (module below, once the apps exist). The
-// 0.0.0.0 "allow Azure services" rule would admit every Azure tenant. These addresses belong to a shared App
-// Service stamp, so other customers' apps on that stamp share them: private access needs VNet integration,
-// which the F1 and Consumption tiers do not offer (B1 and a Flex Consumption or Premium plan do).
+// 0.0.0.0 is "allow Azure services": connections from any Azure resource, every tenant's included. An
+// allowlist of the apps' outbound addresses does not work here: the Function runs on Consumption, where
+// scaling can move it to outbound addresses outside its reported possibleOutboundIpAddresses, so ingestion
+// would lose the database at random. What stands between other tenants and the data is the generated admin
+// password (Key Vault only) and TLS. Closing the port needs VNet integration and private access, which the
+// F1 and Consumption plans cannot join (ADR 0005).
+resource pgAllowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
+  parent: postgres
+  name: 'AllowAzureServices'
+  properties: { startIpAddress: '0.0.0.0', endIpAddress: '0.0.0.0' }
+}
 
 // ----------------------------------------------------------------------------- key vault
 
@@ -361,14 +368,6 @@ resource func 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'WEBSITE_RUN_FROM_PACKAGE', value: '1' }
       ])
     }
-  }
-}
-
-module pgFirewall 'postgres-firewall.bicep' = {
-  name: '${name}-pg-firewall'
-  params: {
-    serverName: postgres.name
-    addresses: union(split(api.properties.possibleOutboundIpAddresses, ','), split(func.properties.possibleOutboundIpAddresses, ','))
   }
 }
 

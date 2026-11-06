@@ -187,6 +187,9 @@ docs/                             PLAN, DEPLOY, decisions/0001-0005
 - Near-duplicate documents (five contracts with one layout) are where retrieval and the small model
   fail; a reranker or document-level filters would be the next step.
 - Azure AI Search is not implemented; pgvector on Azure Database for PostgreSQL fills the same port.
+- In Azure, Postgres accepts connections from any Azure resource ("allow Azure services"), protected by
+  a generated password and verified TLS: the Consumption Function has no fixed outbound address to
+  allowlist. Private access needs paid plans (`docs/decisions/0005`).
 - Documents have one owner; there is no sharing model, no retention policy, no OCR for scanned PDFs.
 - The eval set is 48 questions generated from the corpus's own facts, two of them prompt-injection
   cases: a smoke-level set, not a benchmark.

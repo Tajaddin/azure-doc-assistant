@@ -46,15 +46,18 @@ public class InfraTests
     }
 
     [Fact]
-    public void Postgres_admits_only_the_apps_outbound_addresses_and_verifies_the_server_certificate()
+    public void Postgres_stays_reachable_from_the_consumption_function_and_verifies_the_server_certificate()
     {
         var bicep = RepoFiles.Read("infra", "bicep", "resources.bicep");
-        // 0.0.0.0-0.0.0.0 is "allow every Azure service", which is every tenant's resources, not just ours
-        Assert.DoesNotMatch(@"startIpAddress:\s*'0\.0\.0\.0'", bicep);
-        Assert.Contains("possibleOutboundIpAddresses", bicep, StringComparison.Ordinal);
+        // On Consumption, scaling can give the Function outbound addresses it did not report, so a firewall
+        // built from them drops ingestion's connections; until the Function has fixed or private egress the
+        // server admits Azure services (0.0.0.0) and relies on the password and TLS (ADR 0005).
+        Assert.Contains("sku: { name: 'Y1', tier: 'Dynamic' }", bicep, StringComparison.Ordinal);
+        Assert.DoesNotContain("func.properties.possibleOutboundIpAddresses", bicep, StringComparison.Ordinal);
+        Assert.DoesNotContain("func.properties.outboundIpAddresses", bicep, StringComparison.Ordinal);
+        Assert.Matches(@"startIpAddress:\s*'0\.0\.0\.0',\s*endIpAddress:\s*'0\.0\.0\.0'", bicep);
         Assert.DoesNotContain("Trust Server Certificate", bicep, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SSL Mode=VerifyFull", bicep, StringComparison.Ordinal);
-        Assert.Matches(@"for \(address, i\) in addresses", RepoFiles.Read("infra", "bicep", "postgres-firewall.bicep"));
     }
 
     [Fact]

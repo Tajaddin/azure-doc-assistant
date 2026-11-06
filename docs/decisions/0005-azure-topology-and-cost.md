@@ -1,6 +1,7 @@
 # 0005. Azure topology: App Service + Functions + Static Web Apps, managed identities, one Bicep deployment
 
-Date: 2026-10-17. Status: accepted (templates validated and linted, not yet deployed).
+Date: 2026-10-17. Status: accepted (templates validated and linted on 2026-10-17, not yet deployed;
+the 2026-11 changes are not yet built).
 
 ## Context
 
@@ -36,9 +37,15 @@ string. `deploy.sh` applies the template and publishes the three apps;
 - The F1 plan has no Always On and 60 CPU-minutes a day: fine for a demo, cold starts included. B1 is a
   one-parameter change.
 - Azure AI Search is intentionally absent (see 0001); the Postgres server carries both memory and vectors.
-- Postgres admits only the API's and the Function's possible outbound addresses (one firewall rule each,
-  `postgres-firewall.bicep`), not the "allow Azure services" rule that admits every tenant, and the apps
-  connect with `SSL Mode=VerifyFull`. Those addresses are shared with other apps on the same App Service
-  stamp, and the apps still sign in as the server admin with a password: private access (VNet
-  integration, which needs B1 and a Flex Consumption or Premium plan) and Entra authentication for
-  Postgres are the next steps, not done here.
+- Postgres keeps the "allow Azure services" firewall rule, which admits connections from any Azure
+  resource, other tenants' included. An allowlist of the apps' outbound addresses does not work:
+  on the Consumption plan the Function can be given new outbound addresses as it scales, and Microsoft
+  states that its reported addresses cannot serve as a definitive allowlist, so ingestion would lose the
+  database at random. The protection is the admin password, generated per deployment by `deploy.sh` and
+  stored only in Key Vault, and TLS with `SSL Mode=VerifyFull`. The residual exposure: the port is
+  reachable from all of Azure, and both apps sign in as the server admin. Narrowing it means moving the
+  Function to a dedicated App Service plan (B1 or above, where the possible outbound addresses are stable
+  enough to allowlist, though shared with the stamp's other apps), or VNet integration with private access
+  for Postgres (B1 for the API, Flex Consumption or Premium for the Function); then Entra authentication
+  with a least-privileged role per app. Each adds a fixed monthly cost or a role-setup step the template
+  cannot run, so none is done here.
