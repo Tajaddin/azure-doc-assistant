@@ -77,15 +77,19 @@ the local model.
 
 ### Tests and checks
 
+The unit tests were re-run after the 2026-11 security and ingestion changes. The integration, coverage,
+end-to-end and Bicep rows are from 2026-10-17 and have not been repeated since (they need Docker or the
+Bicep CLI); CI runs all of them.
+
 | Check | Result |
 |---|---|
-| Unit tests (`make test-unit`) | 52 passed: chunking, citations, scoring, regex and LLM extraction, pricing, usage reading, the fake model, dev tokens, PdfPig, the orchestrator with the fake model, the tool loop with a scripted model (executed, bounded, failing tool), the worker loop |
+| Unit tests (`make test-unit`) | 81 passed: chunking (stable chunk ids), citations, scoring, regex and LLM extraction, pricing, usage reading, the fake model, dev tokens, auth start-up rules and the scope policy, PdfPig, the orchestrator with the fake model, prompt assembly (sources as delimited user-turn data) and the injected eval document, the tool loop with a scripted model (executed, bounded, failing tool, cost recorded when the client disconnects), upload ordering, storage clients, the worker loop, Bicep and settings invariants |
 | Integration tests (`make test-integration`, Testcontainers pgvector + Azurite) | 7 passed: health, auth, upload validation, upload-ingest-ask-extract-delete end to end, per-user isolation, SSE stream, rate limit, poison-message handling |
-| Combined line coverage (Core, Infrastructure, Api, Worker) | 67.2% (CI floor 65%) |
+| Combined line coverage (Core, Infrastructure, Api, Worker) | 67.2% on 2026-10-17 (CI floor 65%) |
 | Web (`web/`) | ESLint, Prettier, `tsc` strict, 3 Vitest tests, Vite build |
 | End to end (`make e2e`, Playwright against the compose stack) | 2 passed: sign in, upload, wait for Ready, ask with a citation, extract fields, delete; unauthenticated calls rejected |
 | Alert rules | 6 rules, 7 promtool unit tests, all firing and silent as specified |
-| Infrastructure | `az bicep build` and `az bicep lint` clean |
+| Infrastructure | `az bicep build` and `az bicep lint` clean on 2026-10-17; the 2026-11 template changes are not yet built |
 | Images | API 371 MB, worker 327 MB, non-root, health checks |
 
 ## Quick start

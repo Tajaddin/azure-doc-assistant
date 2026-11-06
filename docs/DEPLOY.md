@@ -34,7 +34,7 @@ profile so the API and worker export spans.
 ## Tests
 
 ```bash
-make test-unit          # 47 tests, no external dependencies
+make test-unit          # 81 tests, no external dependencies
 make test-integration   # 7 tests against pgvector + Azurite in Testcontainers
 make alerts-test        # promtool unit tests for the 6 alert rules
 make bicep-build        # az bicep build + lint in the Azure CLI image
