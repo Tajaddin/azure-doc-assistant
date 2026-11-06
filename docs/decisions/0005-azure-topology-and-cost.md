@@ -34,3 +34,9 @@ storage key is in app settings. `deploy.sh` applies the template and publishes t
 - The F1 plan has no Always On and 60 CPU-minutes a day: fine for a demo, cold starts included. B1 is a
   one-parameter change.
 - Azure AI Search is intentionally absent (see 0001); the Postgres server carries both memory and vectors.
+- Postgres admits only the API's and the Function's possible outbound addresses (one firewall rule each,
+  `postgres-firewall.bicep`), not the "allow Azure services" rule that admits every tenant, and the apps
+  connect with `SSL Mode=VerifyFull`. Those addresses are shared with other apps on the same App Service
+  stamp, and the apps still sign in as the server admin with a password: private access (VNet
+  integration, which needs B1 and a Flex Consumption or Premium plan) and Entra authentication for
+  Postgres are the next steps, not done here.

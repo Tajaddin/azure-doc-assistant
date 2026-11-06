@@ -159,11 +159,10 @@ resource pgDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08
   properties: { charset: 'UTF8', collation: 'en_US.utf8' }
 }
 
-resource pgAllowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
-  parent: postgres
-  name: 'AllowAzureServices'
-  properties: { startIpAddress: '0.0.0.0', endIpAddress: '0.0.0.0' }
-}
+// Only the API's and the Function's outbound addresses may connect (module below, once the apps exist). The
+// 0.0.0.0 "allow Azure services" rule would admit every Azure tenant. These addresses belong to a shared App
+// Service stamp, so other customers' apps on that stamp share them: private access needs VNet integration,
+// which the F1 and Consumption tiers do not offer (B1 and a Flex Consumption or Premium plan do).
 
 // ----------------------------------------------------------------------------- key vault
 
@@ -181,7 +180,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-var pgConnectionString = 'Host=${postgres.properties.fullyQualifiedDomainName};Port=5432;Username=docs;Password=${postgresPassword};Database=docs;SSL Mode=Require;Trust Server Certificate=true'
+// VerifyFull checks the server certificate chain (system trust store) and host name.
+var pgConnectionString = 'Host=${postgres.properties.fullyQualifiedDomainName};Port=5432;Username=docs;Password=${postgresPassword};Database=docs;SSL Mode=VerifyFull'
 
 resource secretPostgres 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
@@ -349,6 +349,14 @@ resource func 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'WEBSITE_RUN_FROM_PACKAGE', value: '1' }
       ])
     }
+  }
+}
+
+module pgFirewall 'postgres-firewall.bicep' = {
+  name: '${name}-pg-firewall'
+  params: {
+    serverName: postgres.name
+    addresses: union(split(api.properties.possibleOutboundIpAddresses, ','), split(func.properties.possibleOutboundIpAddresses, ','))
   }
 }
 

@@ -32,4 +32,16 @@ public class InfraTests
         var subject = Regex.Match(RepoFiles.Read("infra", "bicep", "resources.bicep"), @"subject:\s*'([^']+)'").Groups[1].Value;
         Assert.Equal($"repo:${{githubRepository}}:environment:{environment}", subject);
     }
+
+    [Fact]
+    public void Postgres_admits_only_the_apps_outbound_addresses_and_verifies_the_server_certificate()
+    {
+        var bicep = RepoFiles.Read("infra", "bicep", "resources.bicep");
+        // 0.0.0.0-0.0.0.0 is "allow every Azure service", which is every tenant's resources, not just ours
+        Assert.DoesNotMatch(@"startIpAddress:\s*'0\.0\.0\.0'", bicep);
+        Assert.Contains("possibleOutboundIpAddresses", bicep, StringComparison.Ordinal);
+        Assert.DoesNotContain("Trust Server Certificate", bicep, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SSL Mode=VerifyFull", bicep, StringComparison.Ordinal);
+        Assert.Matches(@"for \(address, i\) in addresses", RepoFiles.Read("infra", "bicep", "postgres-firewall.bicep"));
+    }
 }
