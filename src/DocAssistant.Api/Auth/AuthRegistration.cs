@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Tokens;
 
@@ -39,7 +40,11 @@ public static class AuthRegistration
                 o.MapInboundClaims = false;
             });
         }
-        services.AddAuthorization();
+        // Every RequireAuthorization() endpoint: a signed-in user whose token was issued for this API's scope.
+        services.AddAuthorization(o => o.DefaultPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .RequireAssertion(ctx => ctx.User.HasScope(AuthOptions.ApiScope))
+            .Build());
         return auth;
     }
 }

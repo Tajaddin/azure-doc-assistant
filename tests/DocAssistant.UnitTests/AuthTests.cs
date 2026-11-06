@@ -1,8 +1,12 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using DocAssistant.Api.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Tokens;
 
 namespace DocAssistant.UnitTests;
 
@@ -74,5 +78,73 @@ public class AuthRegistrationTests
         Assert.Equal(AuthOptions.EntraMode, production["Auth:Mode"]);
         Assert.Null(production["Auth:Dev:SigningKey"]);
         Assert.Equal(AuthOptions.DevMode, new ServiceCollection().AddDocAssistantAuth(Settings("Development"), new Env("Development")).Mode);
+    }
+}
+
+public class ApiScopePolicyTests
+{
+    private sealed class Env(string name) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = name;
+        public string ApplicationName { get; set; } = "DocAssistant.Api";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static async Task<bool> AllowedAsync(string environment, IEnumerable<(string Key, string Value)> settings, ClaimsPrincipal user)
+    {
+        var services = new ServiceCollection().AddLogging();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(settings.Select(v => KeyValuePair.Create(v.Key, (string?)v.Value))).Build();
+        services.AddSingleton<IConfiguration>(config); // the web host registers it; Microsoft.Identity.Web's handlers need it
+        services.AddDocAssistantAuth(config, new Env(environment));
+        await using var provider = services.BuildServiceProvider();
+        var policy = await provider.GetRequiredService<IAuthorizationPolicyProvider>().GetDefaultPolicyAsync();
+        var result = await provider.GetRequiredService<IAuthorizationService>().AuthorizeAsync(user, null, policy);
+        return result.Succeeded;
+    }
+
+    private static ClaimsPrincipal Token(params (string Type, string Value)[] claims) =>
+        new(new ClaimsIdentity(claims.Select(c => new Claim(c.Type, c.Value)).Prepend(new Claim("oid", "user-1")), "Bearer"));
+
+    public static TheoryData<string, bool> EntraTokens => new()
+    {
+        { "scp=access_as_user", true },
+        { "scp=User.Read access_as_user", true },
+        { "mapped-scope=access_as_user", true },
+        { "scp=User.Read", false },
+        { "roles=Admin", false },     // app-only (client credentials) token: no delegated scope
+        { "none", false },
+    };
+
+    [Theory]
+    [MemberData(nameof(EntraTokens))]
+    public async Task Entra_mode_requires_the_api_scope(string claims, bool allowed)
+    {
+        var principal = claims switch
+        {
+            "scp=access_as_user" => Token(("scp", "access_as_user")),
+            "scp=User.Read access_as_user" => Token(("scp", "User.Read access_as_user")),
+            "mapped-scope=access_as_user" => Token(("http://schemas.microsoft.com/identity/claims/scope", "access_as_user")),
+            "scp=User.Read" => Token(("scp", "User.Read")),
+            "roles=Admin" => Token(("roles", "Admin"), ("http://schemas.microsoft.com/ws/2008/06/identity/claims/role", "Admin")),
+            _ => Token(),
+        };
+        Assert.Equal(allowed, await AllowedAsync("Production", [("Auth:Mode", "entra")], principal));
+    }
+
+    [Fact]
+    public async Task Dev_tokens_carry_the_scope_and_pass_the_same_policy()
+    {
+        var options = new DevAuthOptions { SigningKey = "unit-test-signing-key-0123456789abcdef" };
+        var issuer = new DevTokenIssuer(options);
+        var principal = new JwtSecurityTokenHandler { MapInboundClaims = false }.ValidateToken(issuer.Issue("alice"), new TokenValidationParameters
+        {
+            ValidIssuer = options.Issuer,
+            ValidAudience = options.Audience,
+            IssuerSigningKey = issuer.Key,
+        }, out _);
+        Assert.True(principal.HasScope(AuthOptions.ApiScope));
+        Assert.True(await AllowedAsync("Development", [("Auth:Mode", "dev"), ("Auth:Dev:SigningKey", options.SigningKey)], principal));
+        Assert.False(await AllowedAsync("Development", [("Auth:Mode", "dev"), ("Auth:Dev:SigningKey", options.SigningKey)], Token()));
     }
 }

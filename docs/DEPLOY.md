@@ -46,7 +46,9 @@ Everything in Azure is created by `infra/bicep` and removed by `infra/bicep/tear
 cannot be created by Bicep and are done once by hand in the Entra admin centre:
 
 1. **API app registration**: name `docassistant-api`; under *Expose an API* set the Application ID URI to
-   `api://<client id>` and add a scope `access_as_user` (admins and users). Note the client id.
+   `api://<client id>` and add a scope `access_as_user` (admins and users). Note the client id. The API
+   rejects tokens without that delegated scope, so app-only (client-credentials) tokens for the API are
+   refused even when the tenant issues them.
 2. **SPA app registration**: name `docassistant-web`; platform *Single-page application* with redirect
    URIs `http://localhost:5173` and (after deploy) `https://<static web app host>`; under *API permissions*
    add the API's `access_as_user` scope and grant consent. Note the client id.

@@ -13,9 +13,11 @@ Entra ID (the posting's environment); locally and in CI there is no tenant.
   There is no "admin" path that omits it. The owner id is the Entra `oid` claim when present, otherwise
   `sub`, read once per request (`ClaimsPrincipal.OwnerId()`).
 - `Auth:Mode=entra` configures `Microsoft.Identity.Web` JWT bearer validation against the tenant and the
-  API app registration. `Auth:Mode=dev` enables `POST /auth/dev-token`, which mints an HS256 token with the
-  same claim shape (`oid`, `sub`, `name`, `preferred_username`) for a named test user; the same name always
-  maps to the same `oid`, so a developer keeps their documents across tokens.
+  API app registration. Every protected endpoint also requires the delegated scope `access_as_user` in
+  `scp`, so a client that signs in as itself (no user, no `scp`) cannot spend model tokens.
+  `Auth:Mode=dev` enables `POST /auth/dev-token`, which mints an HS256 token with the same claim shape
+  (`oid`, `sub`, `name`, `preferred_username`, `scp`) for a named test user; the same name always maps to
+  the same `oid`, so a developer keeps their documents across tokens.
 - Blobs are stored under `{ownerId}/{documentId}.pdf`; the container is private and nothing is served by
   URL. The blob-triggered Function reads both ids from the path and re-checks the record.
 - Uploads are validated (extension, size, `%PDF` magic), questions are length-limited, and the chat and
