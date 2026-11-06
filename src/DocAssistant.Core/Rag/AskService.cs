@@ -164,7 +164,6 @@ public sealed class AskService(
                 history[1] = new ChatMessageContent(AuthorRole.User, Prompts.AnswerUser(Citations.FormatSources(context.Sources), question));
             }
 
-            usage = usage.Add(context.ToolUsage);
             var text = answer.ToString().Trim();
             var citations = Citations.Parse(text, context.Sources);
             if (context.Sources.Count == 0)
@@ -172,9 +171,10 @@ public sealed class AskService(
                 status = "no_sources";
             }
             sw.Stop();
+            usage = usage.Add(context.ToolUsage);
+            finished = true; // from here this path records the cost itself
             var final = new Answer(text, citations, context.Sources, context.ToolCalls, usage, sw.Elapsed, modelName);
 
-            finished = true; // from here this path records the cost itself
             await costs.RecordAsync(new CostEntry(Guid.NewGuid(), ownerId, "ask", modelName, usage.InputTokens, usage.OutputTokens, usage.CostUsd, DateTimeOffset.UtcNow), CancellationToken.None);
             AskDuration.Record(sw.Elapsed.TotalSeconds, new KeyValuePair<string, object?>("status", status));
             AskCount.Add(1, new KeyValuePair<string, object?>("status", status), new KeyValuePair<string, object?>("cited", citations.Count > 0));
