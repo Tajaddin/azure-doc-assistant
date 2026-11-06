@@ -45,6 +45,16 @@ public class InfraTests
         Assert.Contains("SSL Mode=VerifyFull", bicep, StringComparison.Ordinal);
         Assert.Matches(@"for \(address, i\) in addresses", RepoFiles.Read("infra", "bicep", "postgres-firewall.bicep"));
     }
+
+    [Fact]
+    public void Ingestion_function_gets_the_postgres_connection_string_from_key_vault()
+    {
+        // The Function host does not load Key Vault into configuration (the API does), so it needs a reference.
+        var bicep = RepoFiles.Read("infra", "bicep", "resources.bicep");
+        var func = bicep[bicep.IndexOf("resource func 'Microsoft.Web/sites", StringComparison.Ordinal)..];
+        Assert.Contains("{ name: 'Postgres__ConnectionString', value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=Postgres--ConnectionString)' }", func, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddAzureKeyVault", RepoFiles.Read("src", "DocAssistant.Functions", "Program.cs"), StringComparison.Ordinal);
+    }
 }
 
 public class StorageClientTests

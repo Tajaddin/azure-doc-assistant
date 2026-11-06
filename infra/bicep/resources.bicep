@@ -352,6 +352,7 @@ resource func 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'AzureWebJobsStorage__accountName', value: storage.name }
         { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
         { name: 'AzureWebJobsStorage__clientId', value: funcIdentity.properties.clientId }
+        { name: 'Postgres__ConnectionString', value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=Postgres--ConnectionString)' }
         { name: 'DocumentsStorage__blobServiceUri', value: storage.properties.primaryEndpoints.blob }
         { name: 'DocumentsStorage__queueServiceUri', value: storage.properties.primaryEndpoints.queue }
         { name: 'DocumentsStorage__credential', value: 'managedidentity' }
