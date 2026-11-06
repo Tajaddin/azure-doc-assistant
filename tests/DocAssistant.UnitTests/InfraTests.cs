@@ -1,5 +1,16 @@
+using System.Net;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Azure.Core.Pipeline;
+using Azure.Storage.Blobs;
+using DocAssistant.Api.Endpoints;
 using DocAssistant.Infrastructure;
+using DocAssistant.Infrastructure.Postgres;
+using DocAssistant.Infrastructure.Storage;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DocAssistant.UnitTests;
 
@@ -82,6 +93,47 @@ public class StorageClientTests
         var (blobs, _) = DependencyInjection.CreateStorageClients(new StorageOptions { ConnectionString = "UseDevelopmentStorage=true" });
         Assert.True(blobs.CanGenerateAccountSasUri); // Azurite's well-known account key
         Assert.Throws<InvalidOperationException>(() => DependencyInjection.CreateStorageClients(new StorageOptions { BlobServiceUri = "https://stdocs.blob.core.windows.net/" }));
+    }
+
+    private sealed class RecordingHandler : HttpMessageHandler
+    {
+        public List<Uri> Requests { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request.RequestUri!);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+    }
+
+    [Fact]
+    public async Task Readyz_probes_storage_with_a_container_read_that_the_data_role_allows()
+    {
+        // The API's identity has Storage Blob Data Contributor: container reads, but not Get Blob Service
+        // Properties (blobServices/read), which would answer 403 in Azure and fail /readyz on every deploy.
+        var handler = new RecordingHandler();
+        var blobs = new BlobServiceClient(new Uri("https://stdocs.blob.core.windows.net/"), new BlobClientOptions { Transport = new HttpClientTransport(new HttpClient(handler)) });
+        var db = new Db("Host=localhost;Database=docs", 256);
+        await db.DisposeAsync(); // fails at once; only the storage check is under test
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddSingleton(db);
+        builder.Services.AddSingleton(blobs); // as in the app, so a handler asking for the service client gets this one
+        builder.Services.AddSingleton(new BlobDocumentStore(blobs, "documents"));
+        await using var app = builder.Build();
+        app.MapHealth();
+        var readyz = ((IEndpointRouteBuilder)app).DataSources.SelectMany(s => s.Endpoints).OfType<RouteEndpoint>().Single(e => e.RoutePattern.RawText == "/readyz");
+        var ctx = new DefaultHttpContext { RequestServices = app.Services };
+        ctx.Response.Body = new MemoryStream();
+
+        await readyz.RequestDelegate!(ctx);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal("/documents", request.AbsolutePath);
+        Assert.Contains("restype=container", request.Query, StringComparison.Ordinal);
+        ctx.Response.Body.Position = 0;
+        var checks = JsonNode.Parse(ctx.Response.Body)!["checks"]!;
+        Assert.True(checks["storage"]!.GetValue<bool>());
+        Assert.False(checks["postgres"]!.GetValue<bool>());
     }
 
     [Fact]

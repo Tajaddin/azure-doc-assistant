@@ -4,6 +4,7 @@ using DocAssistant.Core.Abstractions;
 using DocAssistant.Core.Domain;
 using DocAssistant.Core.Rag;
 using DocAssistant.Infrastructure.Postgres;
+using DocAssistant.Infrastructure.Storage;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocAssistant.Api.Endpoints;
@@ -19,7 +20,7 @@ public static class EndpointExtensions
     public static void MapHealth(this WebApplication app)
     {
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).ExcludeFromDescription();
-        app.MapGet("/readyz", async (Db db, Azure.Storage.Blobs.BlobServiceClient blobs, CancellationToken ct) =>
+        app.MapGet("/readyz", async (Db db, BlobDocumentStore store, CancellationToken ct) =>
         {
             var checks = new Dictionary<string, bool>();
             try
@@ -35,7 +36,7 @@ public static class EndpointExtensions
             }
             try
             {
-                await blobs.GetPropertiesAsync(ct);
+                await store.ProbeAsync(ct);
                 checks["storage"] = true;
             }
             catch (Exception)

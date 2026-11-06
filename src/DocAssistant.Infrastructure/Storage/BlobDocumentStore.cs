@@ -12,6 +12,14 @@ public sealed class BlobDocumentStore(BlobServiceClient client, string container
     public async Task EnsureCreatedAsync(CancellationToken ct) =>
         await Container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: ct);
 
+    /// <summary>
+    /// Readiness probe: Get Container Properties, which needs blobServices/containers/read (in Storage Blob Data
+    /// Contributor). The account-level Get Blob Service Properties needs blobServices/read, which no data role
+    /// grants, so it fails with 403 under the managed identity.
+    /// </summary>
+    public async Task ProbeAsync(CancellationToken ct) =>
+        await Container.GetPropertiesAsync(cancellationToken: ct);
+
     public async Task SaveAsync(string blobName, Stream content, string contentType, CancellationToken ct)
     {
         var blob = Container.GetBlobClient(blobName);
