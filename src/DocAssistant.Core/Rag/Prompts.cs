@@ -1,8 +1,6 @@
-using System.Text.RegularExpressions;
-
 namespace DocAssistant.Core.Rag;
 
-public static partial class Prompts
+public static class Prompts
 {
     public const string AnswerSystem = """
         You are a document assistant for one user's uploaded business documents (invoices, contracts, manuals).
@@ -22,15 +20,21 @@ public static partial class Prompts
         the sources.
         """;
 
-    [GeneratedRegex(@"</?\s*sources\b[^>]*>", RegexOptions.IgnoreCase)]
-    private static partial Regex SourcesTag();
-
     /// <summary>
-    /// The user turn: retrieved text as a delimited data block, then the question. Delimiter tags inside the
-    /// document text are removed so a document cannot end the block and speak outside it.
+    /// The user turn: retrieved text as a delimited data block, then the question. Angle brackets in the
+    /// sources (file names included), and the fullwidth and small-form brackets that read the same, become
+    /// HTML entities, so no spelling of a tag inside a document can end the block and speak outside it.
     /// </summary>
     public static string AnswerUser(string sources, string question) =>
-        $"<sources>\n{SourcesTag().Replace(sources, string.Empty)}\n</sources>\n\nQuestion: {question}";
+        $"<sources>\n{EscapeBrackets(sources)}\n</sources>\n\nQuestion: {question}";
+
+    private static string EscapeBrackets(string text) => text
+        .Replace("<", "&lt;", StringComparison.Ordinal)
+        .Replace("＜", "&lt;", StringComparison.Ordinal)
+        .Replace("﹤", "&lt;", StringComparison.Ordinal)
+        .Replace(">", "&gt;", StringComparison.Ordinal)
+        .Replace("＞", "&gt;", StringComparison.Ordinal)
+        .Replace("﹥", "&gt;", StringComparison.Ordinal);
 
     public const string ExtractSystem = """
         You extract fields from an invoice. Return only a JSON object with exactly these keys:

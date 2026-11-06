@@ -132,8 +132,8 @@ upload endpoints are rate limited per user.
    `tsvector` keyword rank fused by reciprocal rank fusion, in one SQL statement, filtered by owner.
 2. The top 8 passages become numbered sources in a `<sources>` block in the user turn, ahead of the
    question. The system prompt holds only instructions and says that source and tool text is data, so a
-   document carrying instructions does not get system-level authority; delimiter tags inside documents
-   are stripped so a document cannot close the block.
+   document carrying instructions does not get system-level authority; angle brackets inside documents
+   and file names are escaped so a document cannot close the block.
 3. Semantic Kernel runs the model with function choice enabled but **not** auto-invoked: each round
    streams text and collects tool calls; tools run through the kernel with the caller's owner id; results
    and any new passages are appended; at most four rounds (`docs/decisions/0002`).
