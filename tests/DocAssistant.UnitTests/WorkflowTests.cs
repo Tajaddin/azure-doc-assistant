@@ -89,6 +89,33 @@ public class WorkflowTests
     }
 
     [Fact]
+    public async Task Tokens_are_recorded_when_the_client_stops_reading_mid_answer()
+    {
+        // round 1 calls a tool and reports 100 input / 20 output tokens; the client disconnects during round 2
+        var chat = new ScriptedChatService(
+            new ScriptedChatService.Round(null, ("invoices-list_documents", "{}")),
+            new ScriptedChatService.Round($"The total is ${Inv.Total:0.00} [1], as the invoice states."));
+        var kernel = KernelWith(chat);
+        var (repo, index, _) = Seeded("erin", Inv, InvoiceText);
+        var ledger = new InMemoryLedger();
+        var embedder = new SkEmbedder(kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>(), "hash", 256);
+        var svc = new AskService(kernel, embedder, index, repo, new RegexInvoiceExtractor(), ledger, new ModelPricing(), "scripted", NullLogger<AskService>.Instance);
+
+        await foreach (var ev in svc.StreamAsync("erin", "What is the total?", null, default))
+        {
+            if (ev.Type == "token")
+            {
+                break; // what the SSE endpoint does when a write to a closed connection throws
+            }
+        }
+
+        var entry = Assert.Single(ledger.Entries);
+        Assert.Equal(("erin", "ask"), (entry.OwnerId, entry.Operation));
+        Assert.True(entry.InputTokens > 100, $"round 1's 100 reported tokens plus round 2's estimated prompt, got {entry.InputTokens}");
+        Assert.True(entry.OutputTokens >= 20, $"got {entry.OutputTokens}");
+    }
+
+    [Fact]
     public async Task Unknown_tool_failure_is_reported_back_to_the_model_not_thrown()
     {
         var chat = new ScriptedChatService(

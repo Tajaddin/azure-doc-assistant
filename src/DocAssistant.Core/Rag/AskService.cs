@@ -95,93 +95,142 @@ public sealed class AskService(
         // 3. bounded tool loop, streaming the text of every round
         var answer = new StringBuilder();
         var status = "answered";
-        for (var round = 1; round <= MaxRounds; round++)
+        var roundText = new StringBuilder();
+        var streaming = false;
+        var finished = false;
+        try
         {
-            using var roundSpan = Activity.StartActivity("ask.model.round", ActivityKind.Internal, parent);
-            roundSpan?.SetTag("round", round);
-            var builder = new FunctionCallContentBuilder();
-            var roundText = new StringBuilder();
-            IReadOnlyDictionary<string, object?>? lastMeta = null;
-            await foreach (var update in chat.GetStreamingChatMessageContentsAsync(history, settings, requestKernel, ct))
+            for (var round = 1; round <= MaxRounds; round++)
             {
-                if (!string.IsNullOrEmpty(update.Content))
+                using var roundSpan = Activity.StartActivity("ask.model.round", ActivityKind.Internal, parent);
+                roundSpan?.SetTag("round", round);
+                var builder = new FunctionCallContentBuilder();
+                roundText.Clear();
+                IReadOnlyDictionary<string, object?>? lastMeta = null;
+                await foreach (var update in chat.GetStreamingChatMessageContentsAsync(history, settings, requestKernel, ct))
                 {
-                    roundText.Append(update.Content);
-                    yield return new AskEvent("token", update.Content);
+                    streaming = true;
+                    if (!string.IsNullOrEmpty(update.Content))
+                    {
+                        roundText.Append(update.Content);
+                        yield return new AskEvent("token", update.Content);
+                    }
+                    builder.Append(update);
+                    if (update.Metadata is not null && update.Metadata.ContainsKey("Usage"))
+                    {
+                        lastMeta = update.Metadata;
+                    }
                 }
-                builder.Append(update);
-                if (update.Metadata is not null && update.Metadata.ContainsKey("Usage"))
-                {
-                    lastMeta = update.Metadata;
-                }
-            }
-            var promptChars = string.Join("\n", history.Select(m => m.Content ?? string.Empty));
-            var roundUsage = UsageReader.FromMetadata(lastMeta, modelName, pricing, promptChars, roundText.ToString());
-            usage = usage.Add(roundUsage);
-            roundSpan?.SetTag("tokens.in", roundUsage.InputTokens);
-            roundSpan?.SetTag("tokens.out", roundUsage.OutputTokens);
+                streaming = false;
+                var roundUsage = UsageReader.FromMetadata(lastMeta, modelName, pricing, PromptText(history), roundText.ToString());
+                usage = usage.Add(roundUsage);
+                roundSpan?.SetTag("tokens.in", roundUsage.InputTokens);
+                roundSpan?.SetTag("tokens.out", roundUsage.OutputTokens);
 
-            var calls = builder.Build();
-            if (calls.Count == 0)
-            {
-                answer.Append(roundText);
-                break;
-            }
-            if (round == MaxRounds)
-            {
-                status = "tool_limit";
-                answer.Append(roundText.Length > 0 ? roundText.ToString() : "I could not finish answering within the tool-call limit.");
-                break;
-            }
-            var toolMessage = new ChatMessageContent(AuthorRole.Assistant, content: null);
-            history.Add(toolMessage);
-            foreach (var call in calls)
-            {
-                toolMessage.Items.Add(call);
-                using var toolSpan = Activity.StartActivity("ask.tool", ActivityKind.Internal, roundSpan?.Context ?? parent);
-                toolSpan?.SetTag("tool", call.FunctionName);
-                ToolCalls.Add(1, new KeyValuePair<string, object?>("tool", call.FunctionName));
-                yield return new AskEvent("tool", call.FunctionName, call.Arguments);
-                FunctionResultContent result;
-                try
+                var calls = builder.Build();
+                if (calls.Count == 0)
                 {
-                    result = await call.InvokeAsync(requestKernel, ct);
+                    answer.Append(roundText);
+                    break;
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                if (round == MaxRounds)
                 {
-                    log.LogWarning(ex, "tool {Tool} failed", call.FunctionName);
-                    result = new FunctionResultContent(call, $"error: {ex.Message}");
+                    status = "tool_limit";
+                    answer.Append(roundText.Length > 0 ? roundText.ToString() : "I could not finish answering within the tool-call limit.");
+                    break;
                 }
-                history.Add(result.ToChatMessage());
+                var toolMessage = new ChatMessageContent(AuthorRole.Assistant, content: null);
+                history.Add(toolMessage);
+                foreach (var call in calls)
+                {
+                    toolMessage.Items.Add(call);
+                    using var toolSpan = Activity.StartActivity("ask.tool", ActivityKind.Internal, roundSpan?.Context ?? parent);
+                    toolSpan?.SetTag("tool", call.FunctionName);
+                    ToolCalls.Add(1, new KeyValuePair<string, object?>("tool", call.FunctionName));
+                    yield return new AskEvent("tool", call.FunctionName, call.Arguments);
+                    FunctionResultContent result;
+                    try
+                    {
+                        result = await call.InvokeAsync(requestKernel, ct);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        log.LogWarning(ex, "tool {Tool} failed", call.FunctionName);
+                        result = new FunctionResultContent(call, $"error: {ex.Message}");
+                    }
+                    history.Add(result.ToChatMessage());
+                }
+                // the sources may have grown; rebuild the source block so new numbers are citable
+                history[1] = new ChatMessageContent(AuthorRole.User, Prompts.AnswerUser(Citations.FormatSources(context.Sources), question));
             }
-            // the sources may have grown; rebuild the source block so new numbers are citable
-            history[1] = new ChatMessageContent(AuthorRole.User, Prompts.AnswerUser(Citations.FormatSources(context.Sources), question));
+
+            usage = usage.Add(context.ToolUsage);
+            var text = answer.ToString().Trim();
+            var citations = Citations.Parse(text, context.Sources);
+            if (context.Sources.Count == 0)
+            {
+                status = "no_sources";
+            }
+            sw.Stop();
+            var final = new Answer(text, citations, context.Sources, context.ToolCalls, usage, sw.Elapsed, modelName);
+
+            finished = true; // from here this path records the cost itself
+            await costs.RecordAsync(new CostEntry(Guid.NewGuid(), ownerId, "ask", modelName, usage.InputTokens, usage.OutputTokens, usage.CostUsd, DateTimeOffset.UtcNow), CancellationToken.None);
+            AskDuration.Record(sw.Elapsed.TotalSeconds, new KeyValuePair<string, object?>("status", status));
+            AskCount.Add(1, new KeyValuePair<string, object?>("status", status), new KeyValuePair<string, object?>("cited", citations.Count > 0));
+            Tokens.Add(usage.InputTokens, new KeyValuePair<string, object?>("direction", "input"));
+            Tokens.Add(usage.OutputTokens, new KeyValuePair<string, object?>("direction", "output"));
+            Cost.Add((double)usage.CostUsd);
+            span?.SetTag("status", status);
+            span?.SetTag("citations", citations.Count);
+            span?.SetTag("tool_calls", context.ToolCalls.Count);
+            log.LogInformation(
+                "ask done status={Status} ms={Ms} sources={Sources} citations={Citations} tools={Tools} tokens_in={In} tokens_out={Out} cost_usd={Cost} estimated={Estimated} model={Model}",
+                status, (int)sw.Elapsed.TotalMilliseconds, context.Sources.Count, citations.Count, context.ToolCalls.Count,
+                usage.InputTokens, usage.OutputTokens, usage.CostUsd, usage.Estimated, modelName);
+            yield return new AskEvent("done", Data: final);
         }
-
-        usage = usage.Add(context.ToolUsage);
-        var text = answer.ToString().Trim();
-        var citations = Citations.Parse(text, context.Sources);
-        if (context.Sources.Count == 0)
+        finally
         {
-            status = "no_sources";
+            if (!finished)
+            {
+                await RecordUnfinishedAsync(ownerId, usage.Add(context.ToolUsage), streaming ? (PromptText(history), roundText.ToString()) : null);
+            }
         }
-        sw.Stop();
-        var final = new Answer(text, citations, context.Sources, context.ToolCalls, usage, sw.Elapsed, modelName);
+    }
 
-        await costs.RecordAsync(new CostEntry(Guid.NewGuid(), ownerId, "ask", modelName, usage.InputTokens, usage.OutputTokens, usage.CostUsd, DateTimeOffset.UtcNow), CancellationToken.None);
-        AskDuration.Record(sw.Elapsed.TotalSeconds, new KeyValuePair<string, object?>("status", status));
-        AskCount.Add(1, new KeyValuePair<string, object?>("status", status), new KeyValuePair<string, object?>("cited", citations.Count > 0));
+    private static string PromptText(ChatHistory history) => string.Join("\n", history.Select(m => m.Content ?? string.Empty));
+
+    /// <summary>
+    /// The answer did not finish: the client disconnected (the endpoint stops reading), the request was cancelled
+    /// or a round failed. The provider billed what it processed, so the ledger still gets it: finished rounds as
+    /// reported, and a round cut off mid-stream estimated from its prompt and the text received so far.
+    /// </summary>
+    private async Task RecordUnfinishedAsync(string ownerId, UsageInfo usage, (string Prompt, string Text)? openRound)
+    {
+        if (openRound is { } round)
+        {
+            usage = usage.Add(UsageReader.FromMetadata(null, modelName, pricing, round.Prompt, round.Text));
+        }
+        if (usage.Calls == 0)
+        {
+            return;
+        }
+        try
+        {
+            await costs.RecordAsync(new CostEntry(Guid.NewGuid(), ownerId, "ask", modelName, usage.InputTokens, usage.OutputTokens, usage.CostUsd, DateTimeOffset.UtcNow), CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "could not record the cost of an unfinished answer");
+        }
+        AskCount.Add(1, new KeyValuePair<string, object?>("status", "unfinished"));
         Tokens.Add(usage.InputTokens, new KeyValuePair<string, object?>("direction", "input"));
         Tokens.Add(usage.OutputTokens, new KeyValuePair<string, object?>("direction", "output"));
         Cost.Add((double)usage.CostUsd);
-        span?.SetTag("status", status);
-        span?.SetTag("citations", citations.Count);
-        span?.SetTag("tool_calls", context.ToolCalls.Count);
         log.LogInformation(
-            "ask done status={Status} ms={Ms} sources={Sources} citations={Citations} tools={Tools} tokens_in={In} tokens_out={Out} cost_usd={Cost} estimated={Estimated} model={Model}",
-            status, (int)sw.Elapsed.TotalMilliseconds, context.Sources.Count, citations.Count, context.ToolCalls.Count,
+            "ask unfinished tokens_in={In} tokens_out={Out} cost_usd={Cost} estimated={Estimated} model={Model}",
             usage.InputTokens, usage.OutputTokens, usage.CostUsd, usage.Estimated, modelName);
-        yield return new AskEvent("done", Data: final);
     }
 
     public static object SourceView(SearchHit h, int i) => new
