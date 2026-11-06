@@ -151,11 +151,18 @@ public sealed class ScriptedChatService(params ScriptedChatService.Round[] round
     public int Calls => _next;
     public IReadOnlyDictionary<string, object?> Attributes { get; } = new Dictionary<string, object?>();
 
-    private Round Take() => rounds[Math.Min(_next++, rounds.Length - 1)];
+    /// <summary>What the model was shown on each call: role and text of every message, copied before the caller mutates the history.</summary>
+    public List<IReadOnlyList<(AuthorRole Role, string Content)>> Seen { get; } = [];
+
+    private Round Take(ChatHistory history)
+    {
+        Seen.Add(history.Select(m => (m.Role, m.Content ?? string.Empty)).ToList());
+        return rounds[Math.Min(_next++, rounds.Length - 1)];
+    }
 
     public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
     {
-        var round = Take();
+        var round = Take(chatHistory);
         var message = new ChatMessageContent(AuthorRole.Assistant, round.Text ?? string.Empty);
         foreach (var (fn, args) in round.Calls)
         {
@@ -166,7 +173,7 @@ public sealed class ScriptedChatService(params ScriptedChatService.Round[] round
 
     public async IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var round = Take();
+        var round = Take(chatHistory);
         var i = 0;
         foreach (var (fn, args) in round.Calls)
         {

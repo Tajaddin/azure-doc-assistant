@@ -15,9 +15,10 @@ namespace DocAssistant.Core.Rag;
 public sealed record AskEvent(string Type, string? Text = null, object? Data = null);
 
 /// <summary>
-/// Retrieval-augmented answering with Semantic Kernel: hybrid retrieval, a numbered-source prompt, and a
-/// bounded manual function-calling loop (search_documents, lookup_invoice, list_documents). The loop is
-/// manual rather than auto-invoke so every model round is accounted for (tokens, cost, span) and capped.
+/// Retrieval-augmented answering with Semantic Kernel: hybrid retrieval, numbered sources passed as data in
+/// the user turn, and a bounded manual function-calling loop (search_documents, lookup_invoice,
+/// list_documents). The loop is manual rather than auto-invoke so every model round is accounted for
+/// (tokens, cost, span) and capped.
 /// </summary>
 public sealed class AskService(
     Kernel kernel,
@@ -86,8 +87,10 @@ public sealed class AskService(
             MaxTokens = 700,
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: false),
         };
-        var history = new ChatHistory(Prompts.AnswerSystem.Replace("{{sources}}", Citations.FormatSources(context.Sources)));
-        history.AddUserMessage(question);
+        // Retrieved text goes in the user turn as delimited data, never in the system prompt: a document can
+        // carry instructions, and the system role would give them authority over every answer.
+        var history = new ChatHistory(Prompts.AnswerSystem);
+        history.AddUserMessage(Prompts.AnswerUser(Citations.FormatSources(context.Sources), question));
 
         // 3. bounded tool loop, streaming the text of every round
         var answer = new StringBuilder();
@@ -151,8 +154,8 @@ public sealed class AskService(
                 }
                 history.Add(result.ToChatMessage());
             }
-            // the sources may have grown; refresh the system prompt so new numbers are citable
-            history[0] = new ChatMessageContent(AuthorRole.System, Prompts.AnswerSystem.Replace("{{sources}}", Citations.FormatSources(context.Sources)));
+            // the sources may have grown; rebuild the source block so new numbers are citable
+            history[1] = new ChatMessageContent(AuthorRole.User, Prompts.AnswerUser(Citations.FormatSources(context.Sources), question));
         }
 
         usage = usage.Add(context.ToolUsage);

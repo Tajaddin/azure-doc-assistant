@@ -41,7 +41,9 @@ carries its citations, the sources it saw, the tools it used, token counts and t
 All numbers come from committed tools run on 2026-10-17 on one machine (Windows 11, i7, RTX 4060 8 GB,
 Docker Desktop). The model is **a local 3-billion-parameter model (`qwen2.5:3b` through Ollama), not
 Azure OpenAI**; Azure numbers will be added after a deployment with his credit. The corpus is synthetic,
-born-digital and small, so these are an upper bound for messy real documents.
+born-digital and small, so these are an upper bound for messy real documents. The question runs predate
+the change that moved retrieved sources out of the system prompt into the user turn and have not been
+repeated since, so the answer, citation and latency figures describe the earlier prompt.
 
 ### Evaluation (`make evals`, `tools/DocAssistant.Evals`, 28 documents, 46 questions)
 
@@ -119,7 +121,10 @@ upload endpoints are rate limited per user.
 
 1. The question is embedded and searched with hybrid retrieval: pgvector cosine similarity and a
    `tsvector` keyword rank fused by reciprocal rank fusion, in one SQL statement, filtered by owner.
-2. The top 8 passages become numbered sources in the system prompt.
+2. The top 8 passages become numbered sources in a `<sources>` block in the user turn, ahead of the
+   question. The system prompt holds only instructions and says that source and tool text is data, so a
+   document carrying instructions does not get system-level authority; delimiter tags inside documents
+   are stripped so a document cannot close the block.
 3. Semantic Kernel runs the model with function choice enabled but **not** auto-invoked: each round
    streams text and collects tool calls; tools run through the kernel with the caller's owner id; results
    and any new passages are appended; at most four rounds (`docs/decisions/0002`).

@@ -58,11 +58,11 @@ public sealed partial class FakeChatCompletionService : IChatCompletionService
             var fields = DocAssistant.Core.Extraction.RegexInvoiceExtractor.Extract(user);
             return System.Text.Json.JsonSerializer.Serialize(fields);
         }
-        if (system.Contains("(no sources found)", StringComparison.Ordinal))
+        if (user.Contains("(no sources found)", StringComparison.Ordinal))
         {
             return "The documents do not contain information about that.";
         }
-        var m = FirstSource().Match(system);
+        var m = FirstSource().Match(user);
         if (!m.Success)
         {
             return "I could not find a source to answer that.";

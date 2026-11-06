@@ -15,10 +15,13 @@ number of model calls, their token usage and any runaway tool chatter are invisi
 chat history, provider-neutral chat and embedding services, streaming) and runs the tool loop itself with
 `FunctionChoiceBehavior.Auto(autoInvoke: false)`:
 
-1. Hybrid retrieval puts the top 8 passages in the system prompt as numbered sources `[n]`.
+1. Hybrid retrieval puts the top 8 passages in the user turn as numbered sources `[n]`, inside a
+   `<sources>` block ahead of the question. The system prompt carries only instructions (amended
+   2026-11; the sources used to be in the system prompt, where a document's embedded instructions
+   carried system-level authority).
 2. Each round streams the model's reply; `FunctionCallContentBuilder` assembles any tool calls.
 3. Tool calls are executed through the kernel (`search_documents`, `lookup_invoice`, `list_documents`),
-   their results appended to the history, and the source list extended so new passages are citable.
+   their results appended to the history, and the source block rebuilt so new passages are citable.
 4. At most four rounds; the answer's `[n]` markers are parsed into `Citation` objects pointing at document,
    page and chunk; usage is read from every round's metadata and priced, or estimated and flagged when a
    provider reports none.
