@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using DocAssistant.Infrastructure;
 
 namespace DocAssistant.UnitTests;
 
@@ -43,5 +44,43 @@ public class InfraTests
         Assert.DoesNotContain("Trust Server Certificate", bicep, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SSL Mode=VerifyFull", bicep, StringComparison.Ordinal);
         Assert.Matches(@"for \(address, i\) in addresses", RepoFiles.Read("infra", "bicep", "postgres-firewall.bicep"));
+    }
+}
+
+public class StorageClientTests
+{
+    [Fact]
+    public void Service_uris_select_the_managed_identity_even_when_a_connection_string_is_also_set()
+    {
+        var options = new StorageOptions
+        {
+            ConnectionString = "UseDevelopmentStorage=true", // appsettings.json default, still present in Azure
+            BlobServiceUri = "https://stdocs.blob.core.windows.net/",
+            QueueServiceUri = "https://stdocs.queue.core.windows.net/",
+        };
+        var (blobs, queues) = DependencyInjection.CreateStorageClients(options);
+        Assert.Equal(new Uri(options.BlobServiceUri), blobs.Uri);
+        Assert.Equal(new Uri(options.QueueServiceUri), queues.Uri);
+        // a client built from a token credential holds no account key, so it cannot sign SAS tokens
+        Assert.False(blobs.CanGenerateAccountSasUri);
+        Assert.False(queues.CanGenerateAccountSasUri);
+    }
+
+    [Fact]
+    public void Without_service_uris_the_connection_string_is_used_and_half_a_configuration_fails()
+    {
+        var (blobs, _) = DependencyInjection.CreateStorageClients(new StorageOptions { ConnectionString = "UseDevelopmentStorage=true" });
+        Assert.True(blobs.CanGenerateAccountSasUri); // Azurite's well-known account key
+        Assert.Throws<InvalidOperationException>(() => DependencyInjection.CreateStorageClients(new StorageOptions { BlobServiceUri = "https://stdocs.blob.core.windows.net/" }));
+    }
+
+    [Fact]
+    public void Bicep_gives_the_apps_storage_endpoints_and_no_account_key()
+    {
+        var bicep = RepoFiles.Read("infra", "bicep", "resources.bicep");
+        Assert.DoesNotContain("listKeys", bicep, StringComparison.Ordinal);
+        Assert.DoesNotContain("AccountKey", bicep, StringComparison.Ordinal);
+        Assert.Contains("Storage__BlobServiceUri", bicep, StringComparison.Ordinal);
+        Assert.Contains("Storage__QueueServiceUri", bicep, StringComparison.Ordinal);
     }
 }

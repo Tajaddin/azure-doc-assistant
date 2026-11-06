@@ -16,10 +16,12 @@ extension), Key Vault (RBAC), Log Analytics + Application Insights, an App Servi
 the API, a Consumption Function App for ingestion, a Free Static Web App, and three user-assigned
 identities: API, Function and a deploy identity federated to the GitHub repository for OIDC.
 
-Secrets exist only in Key Vault (`Postgres--ConnectionString`, `Storage--ConnectionString`); the apps read
-them through Key Vault references and `KeyVault:Uri`. Azure OpenAI, Document Intelligence and Blob
-Storage are called with the managed identities (RBAC role assignments in the template), so no model or
-storage key is in app settings. `deploy.sh` applies the template and publishes the three apps;
+The one secret, `Postgres--ConnectionString`, exists only in Key Vault; the apps read it through Key
+Vault references and `KeyVault:Uri`. Azure OpenAI, Document Intelligence and Storage (blobs, the queue,
+the Function's blob trigger and its host storage) are called with the managed identities (RBAC role
+assignments in the template), so no model or storage key is in app settings or Key Vault; the apps get
+the storage endpoints (`Storage__BlobServiceUri`, `Storage__QueueServiceUri`) instead of a connection
+string. `deploy.sh` applies the template and publishes the three apps;
 `teardown.sh` deletes the resource group and purges the soft-deleted vault and cognitive accounts.
 
 ## Consequences

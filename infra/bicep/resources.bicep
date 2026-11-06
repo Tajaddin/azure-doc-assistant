@@ -189,19 +189,12 @@ resource secretPostgres 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   properties: { value: pgConnectionString }
 }
 
-resource secretStorage 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVault
-  name: 'Storage--ConnectionString'
-  properties: {
-    value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-  }
-}
-
 // ----------------------------------------------------------------------------- RBAC
 
 var roles = {
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
   storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+  storageBlobDataOwner: 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
   storageQueueDataContributor: '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
   cognitiveServicesOpenAiUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
   cognitiveServicesUser: 'a97b65f3-24c7-4388-baec-2e87135dc908'
@@ -244,10 +237,23 @@ resource apiBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: { roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataContributor), principalId: apiIdentity.properties.principalId, principalType: 'ServicePrincipal' }
 }
 
-resource funcBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storage.id, funcIdentity.id, roles.storageBlobDataContributor)
+resource apiQueueRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storage.id, apiIdentity.id, roles.storageQueueDataContributor)
   scope: storage
-  properties: { roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataContributor), principalId: funcIdentity.properties.principalId, principalType: 'ServicePrincipal' }
+  properties: { roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageQueueDataContributor), principalId: apiIdentity.properties.principalId, principalType: 'ServicePrincipal' }
+}
+
+// The blob trigger and the identity-based host storage need Blob Data Owner plus Queue Data Contributor.
+resource funcBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storage.id, funcIdentity.id, roles.storageBlobDataOwner)
+  scope: storage
+  properties: { roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataOwner), principalId: funcIdentity.properties.principalId, principalType: 'ServicePrincipal' }
+}
+
+resource funcQueueRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storage.id, funcIdentity.id, roles.storageQueueDataContributor)
+  scope: storage
+  properties: { roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageQueueDataContributor), principalId: funcIdentity.properties.principalId, principalType: 'ServicePrincipal' }
 }
 
 resource deployWebRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -266,6 +272,8 @@ var sharedSettings = [
   { name: 'Ai__Azure__EmbeddingDimensions', value: '1536' }
   { name: 'Analyzer__Provider', value: 'azure' }
   { name: 'Analyzer__Endpoint', value: docIntelligence.properties.endpoint }
+  { name: 'Storage__BlobServiceUri', value: storage.properties.primaryEndpoints.blob }
+  { name: 'Storage__QueueServiceUri', value: storage.properties.primaryEndpoints.queue }
   { name: 'KeyVault__Uri', value: keyVault.properties.vaultUri }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
 ]
@@ -344,7 +352,10 @@ resource func 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'AzureWebJobsStorage__accountName', value: storage.name }
         { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
         { name: 'AzureWebJobsStorage__clientId', value: funcIdentity.properties.clientId }
-        { name: 'Storage__ConnectionString', value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=Storage--ConnectionString)' }
+        { name: 'DocumentsStorage__blobServiceUri', value: storage.properties.primaryEndpoints.blob }
+        { name: 'DocumentsStorage__queueServiceUri', value: storage.properties.primaryEndpoints.queue }
+        { name: 'DocumentsStorage__credential', value: 'managedidentity' }
+        { name: 'DocumentsStorage__clientId', value: funcIdentity.properties.clientId }
         { name: 'AZURE_CLIENT_ID', value: funcIdentity.properties.clientId }
         { name: 'WEBSITE_RUN_FROM_PACKAGE', value: '1' }
       ])

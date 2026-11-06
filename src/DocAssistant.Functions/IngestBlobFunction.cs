@@ -9,12 +9,14 @@ namespace DocAssistant.Functions;
 /// <summary>
 /// Blob-triggered ingestion: the API writes {ownerId}/{documentId}.pdf, the trigger fires, and the same
 /// pipeline the worker uses runs here. The blob path carries both ids, so no queue round trip is needed.
+/// The DocumentsStorage connection is identity-based in Azure (DocumentsStorage__blobServiceUri,
+/// __queueServiceUri, __credential, __clientId); locally it can be a connection string.
 /// </summary>
 public sealed class IngestBlobFunction(IngestionPipeline pipeline, IDocumentRepository documents, ILogger<IngestBlobFunction> log)
 {
     [Function("IngestBlob")]
     public async Task RunAsync(
-        [BlobTrigger("documents/{ownerId}/{documentId}.pdf", Connection = "Storage__ConnectionString")] Stream _,
+        [BlobTrigger("documents/{ownerId}/{documentId}.pdf", Connection = "DocumentsStorage")] Stream _,
         string ownerId,
         string documentId,
         CancellationToken ct)
