@@ -49,6 +49,20 @@ public class TextChunkerTests
     {
         Assert.Empty(Chunker.Chunk(Guid.NewGuid(), "u", [new AnalyzedPage(1, "   \n ")]));
     }
+
+    [Fact]
+    public void Chunk_ids_are_stable_across_runs_so_reingestion_overwrites_instead_of_duplicating()
+    {
+        var paragraph = string.Join(" ", Enumerable.Repeat("word", 30));
+        AnalyzedPage[] pages = [new(1, string.Join("\n\n", Enumerable.Repeat(paragraph, 5))), new(2, "second page")];
+        var docId = Guid.NewGuid();
+        var first = Chunker.Chunk(docId, "u", pages).Select(c => c.Id).ToList();
+        var second = Chunker.Chunk(docId, "u", pages).Select(c => c.Id).ToList();
+        Assert.True(first.Count > 2);
+        Assert.Equal(first, second);
+        Assert.Equal(first.Count, first.Distinct().Count());
+        Assert.Empty(first.Intersect(Chunker.Chunk(Guid.NewGuid(), "u", pages).Select(c => c.Id)));
+    }
 }
 
 public class CitationsTests

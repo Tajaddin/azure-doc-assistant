@@ -1,3 +1,6 @@
+using System.Runtime.CompilerServices;
+using DocAssistant.Api.Endpoints;
+using DocAssistant.Core.Abstractions;
 using DocAssistant.Core.Domain;
 using DocAssistant.Core.Extraction;
 using DocAssistant.Core.Ingestion;
@@ -89,6 +92,72 @@ public class WorkflowTests
     }
 
     [Fact]
+    public async Task Tokens_are_recorded_when_the_client_stops_reading_mid_answer()
+    {
+        // round 1 calls a tool and reports 100 input / 20 output tokens; the client disconnects during round 2
+        var chat = new ScriptedChatService(
+            new ScriptedChatService.Round(null, ("invoices-list_documents", "{}")),
+            new ScriptedChatService.Round($"The total is ${Inv.Total:0.00} [1], as the invoice states."));
+        var kernel = KernelWith(chat);
+        var (repo, index, _) = Seeded("erin", Inv, InvoiceText);
+        var ledger = new InMemoryLedger();
+        var embedder = new SkEmbedder(kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>(), "hash", 256);
+        var svc = new AskService(kernel, embedder, index, repo, new RegexInvoiceExtractor(), ledger, new ModelPricing(), "scripted", NullLogger<AskService>.Instance);
+
+        await foreach (var ev in svc.StreamAsync("erin", "What is the total?", null, default))
+        {
+            if (ev.Type == "token")
+            {
+                break; // what the SSE endpoint does when a write to a closed connection throws
+            }
+        }
+
+        var entry = Assert.Single(ledger.Entries);
+        Assert.Equal(("erin", "ask"), (entry.OwnerId, entry.Operation));
+        Assert.True(entry.InputTokens > 100, $"round 1's 100 reported tokens plus round 2's estimated prompt, got {entry.InputTokens}");
+        Assert.True(entry.OutputTokens >= 20, $"got {entry.OutputTokens}");
+    }
+
+    /// <summary>Takes the request, then sends nothing until the caller gives up.</summary>
+    private sealed class SilentChatService : IChatCompletionService
+    {
+        public TaskCompletionSource Called { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IReadOnlyDictionary<string, object?> Attributes { get; } = new Dictionary<string, object?>();
+
+        public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            Called.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+    }
+
+    [Fact]
+    public async Task The_prompt_is_recorded_when_the_request_is_cancelled_before_the_first_token()
+    {
+        var chat = new SilentChatService();
+        var kernel = KernelWith(chat);
+        var (repo, index, _) = Seeded("frank", Inv, InvoiceText);
+        var ledger = new InMemoryLedger();
+        var embedder = new SkEmbedder(kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>(), "hash", 256);
+        var svc = new AskService(kernel, embedder, index, repo, new RegexInvoiceExtractor(), ledger, new ModelPricing(), "scripted", NullLogger<AskService>.Instance);
+        using var cts = new CancellationTokenSource();
+
+        var ask = svc.AskAsync("frank", "What is the total?", null, cts.Token);
+        await chat.Called.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cts.CancelAsync(); // the prompt has been sent; the provider bills it
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ask);
+        var entry = Assert.Single(ledger.Entries);
+        Assert.Equal(("frank", "ask"), (entry.OwnerId, entry.Operation));
+        Assert.True(entry.InputTokens > 0);
+        Assert.Equal(0, entry.OutputTokens);
+    }
+
+    [Fact]
     public async Task Unknown_tool_failure_is_reported_back_to_the_model_not_thrown()
     {
         var chat = new ScriptedChatService(
@@ -153,5 +222,93 @@ public class WorkflowTests
         Assert.Equal(1, queue.Completed);
         Assert.NotEmpty(index.Items);
         Assert.Contains(Inv.Number, repo.Pages[id][0].Text, StringComparison.Ordinal);
+    }
+}
+
+/// <summary>The blob trigger fires as soon as the blob exists and looks the record up, so the record must come first.</summary>
+public class UploadOrderTests
+{
+    private sealed class RecordingStore(IDocumentRepository repo, bool fail = false) : IDocumentStore
+    {
+        public bool RecordExistedAtSave { get; private set; }
+        public string? Saved { get; private set; }
+        public List<string> Deleted { get; } = [];
+
+        public async Task SaveAsync(string blobName, Stream content, string contentType, CancellationToken ct)
+        {
+            Saved = blobName;
+            RecordExistedAtSave = (await repo.ListAsync("gina", ct)).Any(d => d.BlobName == blobName);
+            if (fail)
+            {
+                throw new IOException("storage unavailable"); // as a timeout looks: the write may still have landed
+            }
+        }
+
+        public Task<Stream> OpenAsync(string blobName, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task DeleteAsync(string blobName, CancellationToken ct)
+        {
+            Deleted.Add(blobName);
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <summary>A repository whose delete fails, as the database can while storage is failing too.</summary>
+    private sealed class UndeletableRepo : IDocumentRepository
+    {
+        private readonly InMemoryRepo _inner = new();
+        public Task CreateAsync(DocumentRecord document, CancellationToken ct) => _inner.CreateAsync(document, ct);
+        public Task<IReadOnlyList<DocumentRecord>> ListAsync(string ownerId, CancellationToken ct) => _inner.ListAsync(ownerId, ct);
+        public Task<bool> DeleteAsync(string ownerId, Guid id, CancellationToken ct) => throw new InvalidOperationException("database unavailable");
+        public Task<DocumentRecord?> GetAsync(string ownerId, Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task SetStatusAsync(Guid id, DocumentStatus status, string? error, CancellationToken ct) => throw new NotSupportedException();
+        public Task SetIndexedAsync(Guid id, DocumentKind kind, int pageCount, int chunkCount, CancellationToken ct) => throw new NotSupportedException();
+        public Task SavePagesAsync(Guid id, IReadOnlyList<AnalyzedPage> pages, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<AnalyzedPage>> GetPagesAsync(string ownerId, Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task SaveInvoiceFieldsAsync(Guid id, InvoiceFields fields, string method, CancellationToken ct) => throw new NotSupportedException();
+        public Task<(InvoiceFields Fields, string Method)?> GetInvoiceFieldsAsync(string ownerId, Guid id, CancellationToken ct) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task Record_is_written_before_the_blob_and_the_message_after_it()
+    {
+        var repo = new InMemoryRepo();
+        var store = new RecordingStore(repo);
+        var queue = new InMemoryQueue();
+        var record = await EndpointExtensions.StoreUploadAsync("gina", "INV-1.pdf", new MemoryStream([1, 2, 3]), 3, store, repo, queue, NullLogger.Instance, default);
+
+        Assert.True(store.RecordExistedAtSave);
+        Assert.Equal(DocumentStatus.Uploaded, repo.Docs[record.Id].Status);
+        Assert.Equal($"gina/{record.Id}.pdf", record.BlobName);
+        var queued = await queue.DequeueAsync(default);
+        Assert.Equal(record.Id, queued!.Message.DocumentId);
+    }
+
+    [Fact]
+    public async Task A_failed_blob_write_removes_the_blob_and_the_record_and_queues_nothing()
+    {
+        var repo = new InMemoryRepo();
+        var queue = new InMemoryQueue();
+        var store = new RecordingStore(repo, fail: true);
+        await Assert.ThrowsAsync<IOException>(() =>
+            EndpointExtensions.StoreUploadAsync("gina", "INV-1.pdf", new MemoryStream([1, 2, 3]), 3, store, repo, queue, NullLogger.Instance, default));
+
+        Assert.Empty(repo.Docs);
+        Assert.Equal([store.Saved!], store.Deleted);
+        Assert.Null(await queue.DequeueAsync(default));
+    }
+
+    [Fact]
+    public async Task A_failing_clean_up_does_not_hide_the_storage_error()
+    {
+        var repo = new UndeletableRepo();
+        var store = new RecordingStore(repo, fail: true);
+        var queue = new InMemoryQueue();
+        var ex = await Assert.ThrowsAsync<IOException>(() =>
+            EndpointExtensions.StoreUploadAsync("gina", "INV-1.pdf", new MemoryStream([1, 2, 3]), 3, store, repo, queue, NullLogger.Instance, default));
+
+        Assert.Equal("storage unavailable", ex.Message);
+        Assert.Equal([store.Saved!], store.Deleted);
+        Assert.Null(await queue.DequeueAsync(default));
     }
 }

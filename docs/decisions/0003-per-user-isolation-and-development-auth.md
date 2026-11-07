@@ -13,9 +13,11 @@ Entra ID (the posting's environment); locally and in CI there is no tenant.
   There is no "admin" path that omits it. The owner id is the Entra `oid` claim when present, otherwise
   `sub`, read once per request (`ClaimsPrincipal.OwnerId()`).
 - `Auth:Mode=entra` configures `Microsoft.Identity.Web` JWT bearer validation against the tenant and the
-  API app registration. `Auth:Mode=dev` enables `POST /auth/dev-token`, which mints an HS256 token with the
-  same claim shape (`oid`, `sub`, `name`, `preferred_username`) for a named test user; the same name always
-  maps to the same `oid`, so a developer keeps their documents across tokens.
+  API app registration. Every protected endpoint also requires the delegated scope `access_as_user` in
+  `scp`, so a client that signs in as itself (no user, no `scp`) cannot spend model tokens.
+  `Auth:Mode=dev` enables `POST /auth/dev-token`, which mints an HS256 token with the same claim shape
+  (`oid`, `sub`, `name`, `preferred_username`, `scp`) for a named test user; the same name always maps to
+  the same `oid`, so a developer keeps their documents across tokens.
 - Blobs are stored under `{ownerId}/{documentId}.pdf`; the container is private and nothing is served by
   URL. The blob-triggered Function reads both ids from the path and re-checks the record.
 - Uploads are validated (extension, size, `%PDF` magic), questions are length-limited, and the chat and
@@ -26,5 +28,8 @@ Entra ID (the posting's environment); locally and in CI there is no tenant.
 - The integration test `Users_cannot_see_each_others_documents` proves the property end to end: a second
   user sees no documents, gets 404 on the first user's ids, and gets no sources or citations when asking.
 - The dev token issuer is a real attack surface if it leaked into production, so it only exists when
-  `Auth:Mode=dev`; the Bicep sets `entra` and the Static Web App build sets `VITE_AUTH_MODE=entra`.
+  `Auth:Mode=dev`, and the API refuses to start in that mode outside the Development environment (an
+  unknown mode or a signing key under 32 bytes also stops start-up). `appsettings.json` selects `entra`;
+  the dev mode and its local signing key live in `appsettings.Development.json`, and compose runs the
+  API as Development. The Bicep sets `entra` and the Static Web App build sets `VITE_AUTH_MODE=entra`.
 - Role- or group-based sharing is not modelled; a document has exactly one owner.

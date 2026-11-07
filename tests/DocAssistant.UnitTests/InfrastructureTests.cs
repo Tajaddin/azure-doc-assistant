@@ -39,8 +39,8 @@ public class FakeChatCompletionServiceTests
     public async Task Quotes_the_first_source_and_cites_it()
     {
         var svc = new FakeChatCompletionService();
-        var history = new ChatHistory(Prompts.AnswerSystem.Replace("{{sources}}", "[1] INV-1.pdf, page 1:\nTotal Due: $10.00\nmore"));
-        history.AddUserMessage("total?");
+        var history = new ChatHistory(Prompts.AnswerSystem);
+        history.AddUserMessage(Prompts.AnswerUser("[1] INV-1.pdf, page 1:\nTotal Due: $10.00\nmore", "total?"));
         var reply = await svc.GetChatMessageContentAsync(history);
         Assert.Contains("Total Due: $10.00 [1]", reply.Content, StringComparison.Ordinal);
         Assert.NotNull(reply.Metadata);
@@ -51,8 +51,8 @@ public class FakeChatCompletionServiceTests
     public async Task Declines_without_sources_and_streams_the_same_text()
     {
         var svc = new FakeChatCompletionService();
-        var history = new ChatHistory(Prompts.AnswerSystem.Replace("{{sources}}", "(no sources found)"));
-        history.AddUserMessage("anything");
+        var history = new ChatHistory(Prompts.AnswerSystem);
+        history.AddUserMessage(Prompts.AnswerUser("(no sources found)", "anything"));
         var reply = await svc.GetChatMessageContentAsync(history);
         Assert.Contains("do not contain", reply.Content, StringComparison.Ordinal);
         var streamed = new System.Text.StringBuilder();

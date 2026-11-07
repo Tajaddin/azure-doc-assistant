@@ -4,6 +4,7 @@ using DocAssistant.Core.Abstractions;
 using DocAssistant.Core.Domain;
 using DocAssistant.Core.Rag;
 using DocAssistant.Infrastructure.Postgres;
+using DocAssistant.Infrastructure.Storage;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocAssistant.Api.Endpoints;
@@ -19,7 +20,7 @@ public static class EndpointExtensions
     public static void MapHealth(this WebApplication app)
     {
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).ExcludeFromDescription();
-        app.MapGet("/readyz", async (Db db, Azure.Storage.Blobs.BlobServiceClient blobs, CancellationToken ct) =>
+        app.MapGet("/readyz", async (Db db, BlobDocumentStore store, CancellationToken ct) =>
         {
             var checks = new Dictionary<string, bool>();
             try
@@ -35,7 +36,7 @@ public static class EndpointExtensions
             }
             try
             {
-                await blobs.GetPropertiesAsync(ct);
+                await store.ProbeAsync(ct);
                 checks["storage"] = true;
             }
             catch (Exception)
@@ -49,7 +50,7 @@ public static class EndpointExtensions
 
     public static void MapAuth(this WebApplication app, AuthOptions auth)
     {
-        if (auth.Mode != "dev")
+        if (auth.Mode != AuthOptions.DevMode)
         {
             return;
         }
@@ -69,7 +70,7 @@ public static class EndpointExtensions
     {
         var group = app.MapGroup("/api/documents").RequireAuthorization().WithTags("documents");
 
-        group.MapPost("/", async (HttpContext ctx, IFormFile file, IDocumentStore store, IDocumentRepository repo, IIngestionQueue queue, CancellationToken ct) =>
+        group.MapPost("/", async (HttpContext ctx, IFormFile file, IDocumentStore store, IDocumentRepository repo, IIngestionQueue queue, ILoggerFactory loggers, CancellationToken ct) =>
         {
             if (file.Length == 0 || file.Length > MaxUploadBytes)
             {
@@ -89,14 +90,8 @@ public static class EndpointExtensions
             }
             stream.Position = 0;
 
-            var owner = ctx.User.OwnerId();
-            var id = Guid.NewGuid();
-            var blobName = $"{owner}/{id}.pdf";
-            await store.SaveAsync(blobName, stream, "application/pdf", ct);
-            var record = new DocumentRecord(id, owner, safeName, blobName, file.Length, DocumentKind.Unknown, DocumentStatus.Uploaded, 0, 0, DateTimeOffset.UtcNow, null, null);
-            await repo.CreateAsync(record, ct);
-            await queue.EnqueueAsync(new IngestionMessage(id, owner, blobName, safeName), ct);
-            return Results.Accepted($"/api/documents/{id}", record);
+            var record = await StoreUploadAsync(ctx.User.OwnerId(), safeName, stream, file.Length, store, repo, queue, loggers.CreateLogger("DocAssistant.Api.Upload"), ct);
+            return Results.Accepted($"/api/documents/{record.Id}", record);
         }).RequireRateLimiting("upload").DisableAntiforgery().WithSummary("Upload a PDF; it is indexed asynchronously");
 
         group.MapGet("/", async (HttpContext ctx, IDocumentRepository repo, CancellationToken ct) =>
@@ -147,6 +142,46 @@ public static class EndpointExtensions
             await repo.GetInvoiceFieldsAsync(ctx.User.OwnerId(), id, ct) is { } f
                 ? Results.Ok(new { documentId = id, f.Method, f.Fields })
                 : Results.NotFound());
+    }
+
+    /// <summary>
+    /// Record, then blob, then queue message. The blob trigger fires as soon as the blob exists and looks the
+    /// record up, so the record has to be there first. If the blob write fails, the blob (the write may have
+    /// landed although the call timed out or was cancelled) and the record are removed again, and the
+    /// storage error is the one that propagates.
+    /// </summary>
+    public static async Task<DocumentRecord> StoreUploadAsync(
+        string owner, string fileName, Stream content, long length, IDocumentStore store, IDocumentRepository repo, IIngestionQueue queue,
+        ILogger log, CancellationToken ct)
+    {
+        var id = Guid.NewGuid();
+        var blobName = $"{owner}/{id}.pdf";
+        var record = new DocumentRecord(id, owner, fileName, blobName, length, DocumentKind.Unknown, DocumentStatus.Uploaded, 0, 0, DateTimeOffset.UtcNow, null, null);
+        await repo.CreateAsync(record, ct);
+        try
+        {
+            await store.SaveAsync(blobName, content, "application/pdf", ct);
+        }
+        catch
+        {
+            await UndoAsync(() => store.DeleteAsync(blobName, CancellationToken.None), log, blobName);
+            await UndoAsync(() => repo.DeleteAsync(owner, id, CancellationToken.None), log, blobName);
+            throw;
+        }
+        await queue.EnqueueAsync(new IngestionMessage(id, owner, blobName, fileName), ct);
+        return record;
+    }
+
+    private static async Task UndoAsync(Func<Task> undo, ILogger log, string blobName)
+    {
+        try
+        {
+            await undo();
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "could not undo the failed upload {Blob}", blobName);
+        }
     }
 
     public static void MapAsk(this WebApplication app)

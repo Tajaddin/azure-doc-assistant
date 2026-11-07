@@ -19,8 +19,11 @@ namespace DocAssistant.Infrastructure;
 public sealed class StorageOptions
 {
     public const string Section = "Storage";
-    /// <summary>Azure Storage connection string; "UseDevelopmentStorage=true" targets Azurite.</summary>
+    /// <summary>Azure Storage connection string; "UseDevelopmentStorage=true" targets Azurite. Ignored when the service URIs are set.</summary>
     public string ConnectionString { get; set; } = "UseDevelopmentStorage=true";
+    /// <summary>Blob endpoint (https://account.blob.core.windows.net/). With QueueServiceUri, storage is reached with the managed identity.</summary>
+    public string BlobServiceUri { get; set; } = "";
+    public string QueueServiceUri { get; set; } = "";
     public string Container { get; set; } = "documents";
     public string Queue { get; set; } = "ingest";
 }
@@ -66,8 +69,9 @@ public static class DependencyInjection
         services.AddSingleton<IDocumentIndex, PgVectorDocumentIndex>();
         services.AddSingleton<ICostLedger, PostgresCostLedger>();
 
-        services.AddSingleton(new BlobServiceClient(storage.ConnectionString));
-        services.AddSingleton(new QueueServiceClient(storage.ConnectionString));
+        var (blobs, queues) = CreateStorageClients(storage);
+        services.AddSingleton(blobs);
+        services.AddSingleton(queues);
         services.AddSingleton<BlobDocumentStore>(sp => new BlobDocumentStore(sp.GetRequiredService<BlobServiceClient>(), storage.Container));
         services.AddSingleton<IDocumentStore>(sp => sp.GetRequiredService<BlobDocumentStore>());
         services.AddSingleton<QueueIngestionQueue>(sp => new QueueIngestionQueue(sp.GetRequiredService<QueueServiceClient>(), storage.Queue));
@@ -101,6 +105,26 @@ public static class DependencyInjection
             sp.GetRequiredService<IDocumentRepository>(), sp.GetRequiredService<IInvoiceExtractor>(), sp.GetRequiredService<ICostLedger>(),
             sp.GetRequiredService<ModelPricing>(), ai.ChatModelName, sp.GetRequiredService<ILogger<AskService>>()));
         return services;
+    }
+
+    /// <summary>
+    /// Managed identity (DefaultAzureCredential, RBAC on the account) when the service URIs are set, as in Azure;
+    /// otherwise the connection string, which is how Azurite is reached locally.
+    /// </summary>
+    public static (BlobServiceClient Blobs, QueueServiceClient Queues) CreateStorageClients(StorageOptions storage)
+    {
+        var hasBlob = !string.IsNullOrWhiteSpace(storage.BlobServiceUri);
+        var hasQueue = !string.IsNullOrWhiteSpace(storage.QueueServiceUri);
+        if (hasBlob != hasQueue)
+        {
+            throw new InvalidOperationException("set both Storage:BlobServiceUri and Storage:QueueServiceUri, or neither");
+        }
+        if (hasBlob)
+        {
+            var credential = new Azure.Identity.DefaultAzureCredential();
+            return (new BlobServiceClient(new Uri(storage.BlobServiceUri), credential), new QueueServiceClient(new Uri(storage.QueueServiceUri), credential));
+        }
+        return (new BlobServiceClient(storage.ConnectionString), new QueueServiceClient(storage.ConnectionString));
     }
 
     /// <summary>Creates the schema, the blob container and the queue. Called once at start-up by every host.</summary>

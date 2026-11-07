@@ -9,12 +9,14 @@ namespace DocAssistant.Functions;
 /// <summary>
 /// Blob-triggered ingestion: the API writes {ownerId}/{documentId}.pdf, the trigger fires, and the same
 /// pipeline the worker uses runs here. The blob path carries both ids, so no queue round trip is needed.
+/// The DocumentsStorage connection is identity-based in Azure (DocumentsStorage__blobServiceUri,
+/// __queueServiceUri, __credential, __clientId); locally it can be a connection string.
 /// </summary>
 public sealed class IngestBlobFunction(IngestionPipeline pipeline, IDocumentRepository documents, ILogger<IngestBlobFunction> log)
 {
     [Function("IngestBlob")]
     public async Task RunAsync(
-        [BlobTrigger("documents/{ownerId}/{documentId}.pdf", Connection = "Storage__ConnectionString")] Stream _,
+        [BlobTrigger("documents/{ownerId}/{documentId}.pdf", Connection = "DocumentsStorage")] Stream _,
         string ownerId,
         string documentId,
         CancellationToken ct)
@@ -27,7 +29,8 @@ public sealed class IngestBlobFunction(IngestionPipeline pipeline, IDocumentRepo
         var doc = await documents.GetAsync(ownerId, id, ct);
         if (doc is null)
         {
-            log.LogWarning("no document record for {DocumentId}; the API must create it before the upload", id);
+            // the API writes the record before the blob, so a blob without one was deleted or its upload rolled back
+            log.LogWarning("no document record for {DocumentId}; skipping", id);
             return;
         }
         if (doc.Status == DocumentStatus.Ready)

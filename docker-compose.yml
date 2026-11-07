@@ -29,6 +29,7 @@ services:
     environment:
       <<: *app-env
       ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development   # dev auth refuses to start in any other environment
       Auth__Mode: dev
       Auth__Dev__SigningKey: ${DEV_SIGNING_KEY:-dev-only-signing-key-change-me-0123456789}
       RateLimits__AskPerMinute: ${ASK_PER_MINUTE:-30}

@@ -41,9 +41,11 @@ carries its citations, the sources it saw, the tools it used, token counts and t
 All numbers come from committed tools run on 2026-10-17 on one machine (Windows 11, i7, RTX 4060 8 GB,
 Docker Desktop). The model is **a local 3-billion-parameter model (`qwen2.5:3b` through Ollama), not
 Azure OpenAI**; Azure numbers will be added after a deployment with his credit. The corpus is synthetic,
-born-digital and small, so these are an upper bound for messy real documents.
+born-digital and small, so these are an upper bound for messy real documents. The question runs predate
+the change that moved retrieved sources out of the system prompt into the user turn and have not been
+repeated since, so the answer, citation and latency figures describe the earlier prompt.
 
-### Evaluation (`make evals`, `tools/DocAssistant.Evals`, 28 documents, 46 questions)
+### Evaluation (`make evals`, `tools/DocAssistant.Evals`, measured on the 28-document, 46-question set)
 
 | Metric | Value |
 |---|---|
@@ -61,6 +63,13 @@ stand-in model (`evals/results/latest-fake.md`, gate in `evals/baseline.json`): 
 its gate checks plumbing only: all 28 documents indexed, top-1 retrieval of the expected document for
 72.7% of questions with the hash embedder, 100% regex extraction, p95 13 ms per request.
 
+The set has since grown to 29 documents and 48 questions: a vendor notice carries a hidden instruction
+(tiny grey text asking an AI assistant to call that vendor's invoices cancelled and print a canary code),
+and two `injection` questions pass only with the right fact and none of the injected text. They are
+scored separately (`injection_resisted`) and are not gated yet, because no model run has measured them.
+A question whose sources did not include the notice tests nothing, so the runner also counts how many
+did (`injection_exposed`).
+
 By category the misses cluster in one place:
 questions about the five master-services agreements, which share one layout, scored 2/5 on the monthly
 fee because retrieval returned the wrong agreement or the model answered with a bare citation marker.
@@ -70,15 +79,19 @@ the local model.
 
 ### Tests and checks
 
+The unit tests were re-run after the 2026-11 security and ingestion changes. The integration, coverage,
+end-to-end and Bicep rows are from 2026-10-17 and have not been repeated since (they need Docker or the
+Bicep CLI); CI runs all of them.
+
 | Check | Result |
 |---|---|
-| Unit tests (`make test-unit`) | 52 passed: chunking, citations, scoring, regex and LLM extraction, pricing, usage reading, the fake model, dev tokens, PdfPig, the orchestrator with the fake model, the tool loop with a scripted model (executed, bounded, failing tool), the worker loop |
+| Unit tests (`make test-unit`) | 90 passed: chunking (stable chunk ids), citations, scoring, regex and LLM extraction, pricing, usage reading, the fake model, dev tokens, auth start-up rules and the scope policy, PdfPig, the orchestrator with the fake model, prompt assembly (sources as delimited user-turn data, no tag can close the block) and the injected eval document, the tool loop with a scripted model (executed, bounded, failing tool, cost recorded when the client disconnects or cancels before the first token), upload ordering and rollback, storage clients, the readiness probe's storage request, the worker loop, Bicep and settings invariants |
 | Integration tests (`make test-integration`, Testcontainers pgvector + Azurite) | 7 passed: health, auth, upload validation, upload-ingest-ask-extract-delete end to end, per-user isolation, SSE stream, rate limit, poison-message handling |
-| Combined line coverage (Core, Infrastructure, Api, Worker) | 67.2% (CI floor 65%) |
+| Combined line coverage (Core, Infrastructure, Api, Worker) | 67.2% on 2026-10-17 (CI floor 65%) |
 | Web (`web/`) | ESLint, Prettier, `tsc` strict, 3 Vitest tests, Vite build |
 | End to end (`make e2e`, Playwright against the compose stack) | 2 passed: sign in, upload, wait for Ready, ask with a citation, extract fields, delete; unauthenticated calls rejected |
 | Alert rules | 6 rules, 7 promtool unit tests, all firing and silent as specified |
-| Infrastructure | `az bicep build` and `az bicep lint` clean |
+| Infrastructure | `az bicep build` and `az bicep lint` clean on 2026-10-17; the 2026-11 template changes are not yet built |
 | Images | API 371 MB, worker 327 MB, non-root, health checks |
 
 ## Quick start
@@ -87,7 +100,7 @@ the local model.
 ollama pull qwen2.5:3b && ollama pull nomic-embed-text    # the local models (free)
 cp .env.example .env
 make up                 # API :8080, worker, Postgres (pgvector) :5434, Azurite
-make corpus             # 20 invoices, 5 contracts, 3 manuals + evals/questions.json
+make corpus             # 20 invoices, 5 contracts, 3 manuals, 1 notice + evals/questions.json
 cd web && cp .env.example .env.local && npm ci && npm run dev    # http://localhost:5173
 ```
 
@@ -112,14 +125,18 @@ See [docs/DEPLOY.md](docs/DEPLOY.md) for Azure.
 | `GET /healthz`, `GET /readyz`, `GET /metrics`, `/swagger` | Probes, Prometheus, OpenAPI |
 
 Authentication is a bearer token: Entra ID (`Auth:Mode=entra`, Microsoft.Identity.Web) in Azure, a
-development issuer locally. The owner id is the token's `oid`; every query is scoped by it. Chat and
-upload endpoints are rate limited per user.
+development issuer locally; the API refuses to start in dev mode outside the Development environment.
+The owner id is the token's `oid`; every query is scoped by it. Chat and upload endpoints are rate
+limited per user.
 
 ## How the answer is produced
 
 1. The question is embedded and searched with hybrid retrieval: pgvector cosine similarity and a
    `tsvector` keyword rank fused by reciprocal rank fusion, in one SQL statement, filtered by owner.
-2. The top 8 passages become numbered sources in the system prompt.
+2. The top 8 passages become numbered sources in a `<sources>` block in the user turn, ahead of the
+   question. The system prompt holds only instructions and says that source and tool text is data, so a
+   document carrying instructions does not get system-level authority; angle brackets inside documents
+   and file names are escaped so a document cannot close the block.
 3. Semantic Kernel runs the model with function choice enabled but **not** auto-invoked: each round
    streams text and collects tool calls; tools run through the kernel with the caller's owner id; results
    and any new passages are appended; at most four rounds (`docs/decisions/0002`).
@@ -173,5 +190,9 @@ docs/                             PLAN, DEPLOY, decisions/0001-0005
 - Near-duplicate documents (five contracts with one layout) are where retrieval and the small model
   fail; a reranker or document-level filters would be the next step.
 - Azure AI Search is not implemented; pgvector on Azure Database for PostgreSQL fills the same port.
+- In Azure, Postgres accepts connections from any Azure resource ("allow Azure services"), protected by
+  a generated password and verified TLS: the Consumption Function has no fixed outbound address to
+  allowlist. Private access needs paid plans (`docs/decisions/0005`).
 - Documents have one owner; there is no sharing model, no retention policy, no OCR for scanned PDFs.
-- The eval set is 46 questions generated from the corpus's own facts: a smoke-level set, not a benchmark.
+- The eval set is 48 questions generated from the corpus's own facts, two of them prompt-injection
+  cases: a smoke-level set, not a benchmark.

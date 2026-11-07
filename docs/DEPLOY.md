@@ -21,7 +21,7 @@ Sign in with any test user name; the API mints a development token. Upload PDFs 
 cp .env.example .env
 make up            # api :8080, worker, postgres :5434, azurite; model = Ollama on the host
 make up-obs        # + otel-collector, tempo, prometheus :9092, alertmanager :9095, grafana :3003
-make evals LABEL=ollama-qwen3.5-4b   # uploads the corpus, asks 46 questions, extracts 20 invoices, writes evals/results
+make evals LABEL=ollama-qwen3.5-4b   # uploads the corpus, asks 48 questions, extracts 20 invoices, writes evals/results
 make e2e           # Playwright against the running stack
 make down
 ```
@@ -34,7 +34,7 @@ profile so the API and worker export spans.
 ## Tests
 
 ```bash
-make test-unit          # 47 tests, no external dependencies
+make test-unit          # 90 tests, no external dependencies
 make test-integration   # 7 tests against pgvector + Azurite in Testcontainers
 make alerts-test        # promtool unit tests for the 6 alert rules
 make bicep-build        # az bicep build + lint in the Azure CLI image
@@ -46,7 +46,9 @@ Everything in Azure is created by `infra/bicep` and removed by `infra/bicep/tear
 cannot be created by Bicep and are done once by hand in the Entra admin centre:
 
 1. **API app registration**: name `docassistant-api`; under *Expose an API* set the Application ID URI to
-   `api://<client id>` and add a scope `access_as_user` (admins and users). Note the client id.
+   `api://<client id>` and add a scope `access_as_user` (admins and users). Note the client id. The API
+   rejects tokens without that delegated scope, so app-only (client-credentials) tokens for the API are
+   refused even when the tenant issues them.
 2. **SPA app registration**: name `docassistant-web`; platform *Single-page application* with redirect
    URIs `http://localhost:5173` and (after deploy) `https://<static web app host>`; under *API permissions*
    add the API's `access_as_user` scope and grant consent. Note the client id.
@@ -64,8 +66,10 @@ bash deploy.sh                                      # about 15 minutes; prints t
 the Consumption plan and the web build to the Static Web App. After the first deploy add the SWA host to
 the SPA registration's redirect URIs.
 
-For the GitHub `deploy` workflow (code-only redeploys over OIDC): repository *Settings, Secrets and
-variables, Actions*. Secrets: `AZURE_CLIENT_ID` (output `deployIdentityClientId`), `AZURE_TENANT_ID`,
+For the GitHub `deploy` workflow (code-only redeploys over OIDC): create the `production` environment
+under *Settings, Environments* (the deploy identity trusts only jobs in that environment, so its
+protection rules decide who can deploy), then repository *Settings, Secrets and variables, Actions*.
+Secrets: `AZURE_CLIENT_ID` (output `deployIdentityClientId`), `AZURE_TENANT_ID`,
 `AZURE_SUBSCRIPTION_ID`, `SWA_DEPLOYMENT_TOKEN` (`az staticwebapp secrets list`). Variables:
 `API_APP_NAME`, `FUNCTION_APP_NAME`, `API_URL`, `SPA_CLIENT_ID`, `API_SCOPE` (`api://<api client id>/access_as_user`).
 
