@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY Directory.Build.props ./
 COPY src/DocAssistant.Core/DocAssistant.Core.csproj src/DocAssistant.Core/
@@ -11,7 +11,7 @@ COPY src/DocAssistant.Infrastructure src/DocAssistant.Infrastructure
 COPY src/DocAssistant.Api src/DocAssistant.Api
 RUN dotnet publish src/DocAssistant.Api/DocAssistant.Api.csproj -c Release -o /app --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app .
